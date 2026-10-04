@@ -186,9 +186,6 @@ export default function DashboardPage() {
 
   // Handle Selection of a specific Demo Site
   async function handleSelectDemoSite(demoUrl: string) {
-    setDemoLoading(true);
-    setError("");
-
     let targetUrl = demoUrl;
     const base = getApiBase();
     if (targetUrl.includes("/demo-site/")) {
@@ -198,17 +195,27 @@ export default function DashboardPage() {
       targetUrl = targetUrl.replace(/^https?:\/\/(localhost|127\.0\.0\.1):8000/i, base);
     }
 
+    // Immediately close modal and show loading in scanner
+    setIsDemoModalOpen(false);
+    setUrl(targetUrl);
+    setScanLoading(true);
+    setError("");
+
+    // Smooth scroll to scanner so user sees execution immediately
+    const scannerEl = document.getElementById("scanner");
+    scannerEl?.scrollIntoView({ behavior: "smooth" });
+
     try {
-      setUrl(targetUrl);
       const response = await startScan(targetUrl);
       setError("");
       setCurrentScanId(response.scan_id);
       setSelectedIssue(null);
       setTimeline([]);
-      setIsDemoModalOpen(false);
-      setDemoLoading(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load demo site");
+      console.error("[AURA Demo Scan Error]:", err);
+      setError(err instanceof Error ? err.message : "Failed to launch scan. Please click 'Scan Website' to retry.");
+    } finally {
+      setScanLoading(false);
       setDemoLoading(false);
     }
   }
