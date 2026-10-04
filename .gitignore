@@ -1,0 +1,19 @@
+﻿# Root gitignore for AURA
+node_modules/
+.next/
+out/
+build/
+dist/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.env
+.env.local
+.env.*.local
+*.log
+*.zip
+demo-site/sandbox/
+.vscode/
+.idea/

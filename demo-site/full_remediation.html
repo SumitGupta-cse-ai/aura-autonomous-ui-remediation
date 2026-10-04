@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<!-- INTENTIONALLY MISSING lang ATTRIBUTE — WCAG 3.1.1 violation -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShopX — Summer Collection | Modern E-Commerce Store</title>
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #0f172a; line-height: 1.5; }
+        *:focus { outline: none; } /* INTENTIONAL: Missing focus outline (WCAG 2.4.7) */
+
+        /* Top Announcement Banner */
+        .top-banner { background: #2563eb; color: #ffffff; text-align: center; padding: 8px 16px; font-size: 13px; font-weight: 600; }
+
+        /* Navbar */
+        nav { background: #ffffff; border-bottom: 1px solid #e2e8f0; padding: 16px 40px; display: flex; align-items: center; justify-content: space-between; }
+        .logo { font-size: 22px; font-weight: 800; color: #1e293b; letter-spacing: -0.5px; }
+        .logo span { color: #2563eb; }
+        
+        .nav-links { display: flex; gap: 24px; align-items: center; }
+        .nav-links a { text-decoration: none; color: #475569; font-size: 14px; font-weight: 500; }
+
+        .search-box { flex: 0.4; max-width: 380px; position: relative; }
+        /* INTENTIONAL: Search input missing label (WCAG 1.3.1 / 4.1.2) */
+        .search-input { width: 100%; padding: 8px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; background: #ffffff; color: #0f172a; }
+
+        .cart-action-btn { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 8px; cursor: pointer; color: #475569; }
+
+        /* Hero Section */
+        .hero { background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-bottom: 1px solid #bfdbfe; padding: 56px 40px; text-align: center; }
+        .hero h1 { font-size: 42px; font-weight: 800; color: #1e3a8a; margin-bottom: 8px; letter-spacing: -1px; }
+        /* INTENTIONAL: Low contrast text (WCAG 1.4.3) */
+        .low-contrast-text { color: #93c5fd; font-size: 15px; max-width: 600px; margin: 0 auto; font-weight: 500; }
+        .hero-btn { display: inline-block; background: #2563eb; color: #ffffff; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; text-decoration: none; margin-top: 20px; }
+
+        /* Layout Grid */
+        .store-layout { max-width: 1280px; margin: 40px auto; padding: 0 24px; display: grid; grid-template-columns: 240px 1fr; gap: 32px; }
+
+        /* Sidebar Filters */
+        aside { background: #ffffff; padding: 24px; border-radius: 12px; border: 1px solid #e2e8f0; height: max-content; }
+        /* INTENTIONAL: Heading order skip (h1 -> h5) (WCAG 1.3.1) */
+        aside h5 { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 14px; }
+        .filter-group { display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: #475569; }
+
+        /* Products Grid */
+        .products-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+        .product-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+        .product-img-wrapper { height: 200px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; }
+        .product-img-wrapper img { width: 100%; height: 100%; object-fit: cover; }
+        .product-body { padding: 20px; display: flex; flex-direction: column; flex: 1; }
+        .product-title { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 6px; }
+        .product-price { font-size: 18px; font-weight: 800; color: #2563eb; margin-top: auto; padding-top: 12px; }
+        .add-to-cart { background: #2563eb; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 12px; }
+
+        /* Newsletter Section */
+        .newsletter { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 40px; margin-top: 48px; text-align: center; }
+        .newsletter h3 { font-size: 22px; font-weight: 700; color: #0f172a; margin-bottom: 8px; }
+        .newsletter-form { display: flex; gap: 12px; max-width: 440px; margin: 20px auto 0; }
+        /* INTENTIONAL: Newsletter input missing label */
+        .newsletter-input { flex: 1; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; }
+        .newsletter-btn { background: #0f172a; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+
+        /* Footer */
+        footer { background: #0f172a; color: #94a3b8; padding: 40px 24px; text-align: center; margin-top: 64px; font-size: 13px; }
+        footer a { color: #38bdf8; text-decoration: none; margin-top: 12px; display: inline-block; }
+    </style>
+</head>
+<body>
+    <div class="top-banner">
+        🔥 ShopX Summer Collection — 20% Off All Orders With Code SUMMER20
+    </div>
+
+    <nav>
+        <span class="logo">SHOP<span>X</span></span>
+        
+        <div class="nav-links">
+            <a href="#home">Home</a>
+            <a href="#products">Products</a>
+            <a href="#about">About</a>
+            <a href="#contact">Contact</a>
+        </div>
+
+        <div class="search-box">
+            <!-- INTENTIONAL: Search input without label (WCAG 1.3.1) -->
+            <input type="text" class="search-input" placeholder="Search products...">
+        </div>
+
+        <!-- INTENTIONAL: Cart button without aria-label (WCAG 4.1.2) -->
+        <button class="cart-action-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"></path>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <path d="M16 10a4 4 0 01-8 0"></path>
+            </svg>
+        </button>
+    </nav>
+
+    <div class="hero">
+        <h1>Summer Collection</h1>
+        <!-- INTENTIONAL: Low contrast text (WCAG 1.4.3) -->
+        <p class="low-contrast-text">Discover lightweight apparel and outdoor gear engineered for summer adventures.</p>
+        <a href="#products" class="hero-btn">Shop Now</a>
+    </div>
+
+    <div class="store-layout" id="products">
+        <aside>
+            <!-- INTENTIONAL: Heading skip h1 -> h5 (WCAG 1.3.1) -->
+            <h5>Filter By Category</h5>
+            <div class="filter-group">
+                <!-- INTENTIONAL: Checkboxes missing label association (WCAG 1.3.1) -->
+                <label><input type="checkbox" class="filter-checkbox" checked> All Items</label>
+                <label><input type="checkbox" class="filter-checkbox"> Apparel</label>
+                <label><input type="checkbox" class="filter-checkbox"> Footwear</label>
+                <label><input type="checkbox" class="filter-checkbox"> Accessories</label>
+            </div>
+        </aside>
+
+        <main class="products-grid">
+            <div class="product-card">
+                <div class="product-img-wrapper">
+                    <!-- INTENTIONAL: Image missing alt attribute (WCAG 1.1.1) -->
+                    <img src="https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=80" class="hero-product">
+                </div>
+                <div class="product-body">
+                    <h4 class="product-title">Classic Organic Cotton Tee</h4>
+                    <span class="product-price">$28.00</span>
+                    <button class="add-to-cart">Add To Cart</button>
+                </div>
+            </div>
+
+            <div class="product-card">
+                <div class="product-img-wrapper">
+                    <!-- INTENTIONAL: Image missing alt attribute (WCAG 1.1.1) -->
+                    <img src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&auto=format&fit=crop&q=80" class="card-product-1">
+                </div>
+                <div class="product-body">
+                    <h4 class="product-title">Breathable Trail Sneakers</h4>
+                    <span class="product-price">$89.00</span>
+                    <button class="add-to-cart">Add To Cart</button>
+                </div>
+            </div>
+
+            <div class="product-card">
+                <div class="product-img-wrapper">
+                    <!-- INTENTIONAL: Image missing alt attribute (WCAG 1.1.1) -->
+                    <img src="https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=500&auto=format&fit=crop&q=80" class="card-product-1">
+                </div>
+                <div class="product-body">
+                    <h4 class="product-title">Polarized UV Sunglasses</h4>
+                    <span class="product-price">$45.00</span>
+                    <button class="add-to-cart">Add To Cart</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="newsletter">
+        <h3>Subscribe to ShopX Weekly Deals</h3>
+        <form class="newsletter-form" onsubmit="return false;">
+            <!-- INTENTIONAL: Form input missing label (WCAG 1.3.1) -->
+            <input type="email" class="newsletter-input" placeholder="Enter your email address...">
+            <button type="submit" class="newsletter-btn">Subscribe</button>
+        </form>
+    </div>
+
+    <footer>
+        <p>&copy; 2024 ShopX E-Commerce Full Remediation Demo.</p>
+        <!-- INTENTIONAL: Link wrapping SVG icon without text or aria-label (WCAG 4.1.2) -->
+        <a href="/social">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="#38bdf8">
+                <path d="M22.46 6c-.85.38-1.78.64-2.73.76 1-.6 1.76-1.54 2.12-2.67-.93.55-1.96.95-3.06 1.17-.88-.94-2.13-1.53-3.51-1.53-2.66 0-4.81 2.16-4.81 4.81 0 .38.04.75.13 1.1-4-.2-7.58-2.11-9.96-5.02-.42.72-.66 1.56-.66 2.46 0 1.68.85 3.16 2.14 4.02-.79-.02-1.53-.24-2.18-.6v.06c0 2.35 1.67 4.31 3.88 4.76-.4.1-.83.16-1.27.16-.31 0-.62-.03-.92-.08.63 1.96 2.45 3.39 4.6 3.43-1.68 1.32-3.81 2.1-6.12 2.1-.4 0-.79-.02-1.17-.07 2.19 1.4 4.78 2.22 7.57 2.22 9.07 0 14.02-7.52 14.02-14.02 0-.21 0-.42-.01-.63.96-.7 1.8-1.56 2.46-2.55z"/>
+            </svg>
+        </a>
+    </footer>
+</body>
+</html>
