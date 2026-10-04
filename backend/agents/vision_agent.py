@@ -2,6 +2,7 @@
 
 import os
 import json
+import asyncio
 from typing import Optional, Dict, Any
 from openai import AsyncOpenAI
 
@@ -60,7 +61,8 @@ class VisionAgent:
 
             content = [{"type": "text", "text": context_text}]
 
-            if image_url and not image_url.startswith("data:"):
+            # Only pass actual public URLs to OpenAI Vision (local/demo URLs cannot be fetched by OpenAI)
+            if image_url and (image_url.startswith("http://") or image_url.startswith("https://")) and "aura-bundled-demo" not in image_url and "localhost" not in image_url and "127.0.0.1" not in image_url:
                 content.append({
                     "type": "image_url",
                     "image_url": {"url": image_url, "detail": "low"},
@@ -73,12 +75,15 @@ class VisionAgent:
 
             messages.append({"role": "user", "content": content})
 
-            response = await self.client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=messages,
-                temperature=0.3,
-                max_tokens=200,
-                response_format={"type": "json_object"},
+            response = await asyncio.wait_for(
+                self.client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=messages,
+                    temperature=0.3,
+                    max_tokens=200,
+                    response_format={"type": "json_object"},
+                ),
+                timeout=5.0,
             )
 
             result = json.loads(response.choices[0].message.content)

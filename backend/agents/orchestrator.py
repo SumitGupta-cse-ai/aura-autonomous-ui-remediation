@@ -22,6 +22,7 @@ from agents.fix_planner import FixPlannerAgent
 from agents.verification_agent import VerificationAgent
 from core.patch_compiler import compile_patch
 from core.safety_validator import validate_fix_plan
+from core.memory import log_memory, force_cleanup
 
 MAX_FIX_ATTEMPTS = 3
 
@@ -38,24 +39,43 @@ class Orchestrator:
 
         self._scans: Dict[str, ScanData] = {}
         self._event_callbacks: Dict[str, List[Callable]] = {}
-        self._pages: Dict[str, Any] = {}
-        self._contexts: Dict[str, Any] = {}
+        self._active_scan_id: Optional[str] = None
+        self._active_context: Optional[Any] = None
+        self._active_page: Optional[Any] = None
         self._before_issues: Dict[str, List[Dict]] = {}
-        self._scan_semaphore = asyncio.Semaphore(2)
+        self._scan_semaphore = asyncio.Semaphore(1)  # Strictly 1 scan job at a time
+        self._fix_lock = asyncio.Lock()  # Strictly 1 fix operation at a time
 
         self._db_path = Path(__file__).resolve().parent.parent / "aura_scans.db"
         self._init_sqlite()
         self._load_all_from_db()
 
+    async def _cleanup_active_page(self):
+        """Safely close active page and context and trigger garbage collection immediately."""
+        if self._active_page:
+            try:
+                if hasattr(self._active_page, "close"):
+                    await self._active_page.close()
+            except Exception:
+                pass
+            self._active_page = None
+
+        if self._active_context:
+            try:
+                if hasattr(self._active_context, "close"):
+                    await self._active_context.close()
+            except Exception:
+                pass
+            self._active_context = None
+
+        self._active_scan_id = None
+        force_cleanup()
+
     async def start(self):
         await self.browser_agent.start()
 
     async def stop(self):
-        for ctx in self._contexts.values():
-            try:
-                await ctx.close()
-            except Exception:
-                pass
+        await self._cleanup_active_page()
         await self.browser_agent.stop()
 
     def register_event_callback(self, scan_id: str, callback: Callable):
@@ -114,13 +134,20 @@ class Orchestrator:
                     VALUES (?, ?, ?, ?, ?, ?)
                 """, (scan.scan_id, scan.url, scan.status.value, scan.created_at, now, data_json))
                 conn.commit()
+            # Bound in-memory scan dictionary to 2 active scans to prevent RAM leaks
+            while len(self._scans) > 2:
+                oldest_id = next(iter(self._scans))
+                if oldest_id != scan.scan_id:
+                    self._scans.pop(oldest_id, None)
+                else:
+                    break
         except Exception as e:
             print(f"[Orchestrator] SQLite save error: {e}")
 
     def _load_all_from_db(self):
         try:
             with sqlite3.connect(str(self._db_path)) as conn:
-                cursor = conn.execute("SELECT data_json FROM scan_records ORDER BY created_at ASC")
+                cursor = conn.execute("SELECT data_json FROM scan_records ORDER BY created_at DESC LIMIT 2")
                 for row in cursor.fetchall():
                     try:
                         scan_data = ScanData.model_validate_json(row[0])
@@ -152,10 +179,21 @@ class Orchestrator:
         return None
 
     def get_all_scans(self) -> List[ScanData]:
-        self._load_all_from_db()
-        return list(self._scans.values())
+        scans = []
+        try:
+            with sqlite3.connect(str(self._db_path)) as conn:
+                cursor = conn.execute("SELECT data_json FROM scan_records ORDER BY created_at DESC LIMIT 8")
+                for row in cursor.fetchall():
+                    try:
+                        scans.append(ScanData.model_validate_json(row[0]))
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        return scans if scans else list(self._scans.values())
 
     async def run_scan(self, scan_id: str, url: str):
+        log_memory("scan start")
         scan = self.get_scan(scan_id)
         if not scan:
             scan = ScanData(
@@ -167,178 +205,194 @@ class Orchestrator:
             self._scans[scan_id] = scan
         self._save_scan_to_db(scan)
 
-        try:
-            scan.status = ScanStatus.SCANNING
-            self._save_scan_to_db(scan)
-            await self._emit_event(scan_id, TimelineEventType.ACTION, "Scan started", f"Target: {url}")
-            await self._emit_event(scan_id, TimelineEventType.INFO, "URL validated")
+        async with self._scan_semaphore:
+            # Close prior page/context before starting new scan to prevent memory growth
+            await self._cleanup_active_page()
 
-            # LRU eviction: close oldest contexts if more than 4 are open to save RAM
-            while len(self._contexts) > 4:
-                old_id = next(iter(self._contexts))
-                old_ctx = self._contexts.pop(old_id, None)
-                if old_ctx and hasattr(old_ctx, "close"):
-                    try:
-                        await old_ctx.close()
-                    except Exception:
-                        pass
-                self._pages.pop(old_id, None)
+            try:
+                scan.status = ScanStatus.SCANNING
+                self._save_scan_to_db(scan)
+                await self._emit_event(scan_id, TimelineEventType.ACTION, "Scan started", f"Target: {url}")
+                await self._emit_event(scan_id, TimelineEventType.INFO, "URL validated")
 
-            t0 = time.time()
-            scan_mode = "Playwright" if not self.browser_agent.use_fallback else "HTTP fallback"
-            await self._emit_event(scan_id, TimelineEventType.ACTION, f"Browser launched ({scan_mode})")
+                t0 = time.time()
+                scan_mode = "Playwright" if not self.browser_agent.use_fallback else "HTTP fallback"
+                await self._emit_event(scan_id, TimelineEventType.ACTION, f"Browser launched ({scan_mode})")
 
-            async with self._scan_semaphore:
                 context = await self.browser_agent.create_context()
-                self._contexts[scan_id] = context
+                self._active_context = context
+                self._active_scan_id = scan_id
 
                 try:
                     page = await self.browser_agent.load_page(url, context)
                 except RuntimeError as e:
                     scan.status = ScanStatus.ERROR
+                    self._save_scan_to_db(scan)
                     await self._emit_event(scan_id, TimelineEventType.ERROR,
                                            f"Failed to load page: {str(e)}",
                                            "Check that the URL is accessible and the server is running")
                     return
 
-                self._pages[scan_id] = page
+                self._active_page = page
                 load_ms = int((time.time() - t0) * 1000)
 
                 # Detect if page content was actually loaded
                 html = getattr(page, "patched_html", "") or getattr(page, "html_content", "")
                 if not html or len(html.strip()) < 20:
                     scan.status = ScanStatus.ERROR
+                    self._save_scan_to_db(scan)
                     await self._emit_event(scan_id, TimelineEventType.ERROR,
                                            "Page returned empty or minimal content",
                                            "This may indicate bot protection, authentication, or the page requires JavaScript rendering")
                     return
 
-            await self._emit_event(scan_id, TimelineEventType.SUCCESS,
-                                   f"Page loaded ({len(html):,} bytes)",
-                                   f"Took {load_ms}ms",
-                                   duration_ms=load_ms)
+                await self._emit_event(scan_id, TimelineEventType.SUCCESS,
+                                       f"Page loaded ({len(html):,} bytes)",
+                                       f"Took {load_ms}ms",
+                                       duration_ms=load_ms)
 
-            screenshot = await self.browser_agent.take_screenshot(page)
-            scan.screenshot = screenshot
-            await self._emit_event(scan_id, TimelineEventType.INFO, "Screenshot captured")
+                screenshot = await self.browser_agent.take_screenshot(page)
+                scan.screenshot = screenshot
+                await self._emit_event(scan_id, TimelineEventType.INFO, "Screenshot captured")
 
-            scan.status = ScanStatus.AUDITING
-            await self._emit_event(scan_id, TimelineEventType.ACTION, "Accessibility audit started", "Running axe-core analysis")
+                scan.status = ScanStatus.AUDITING
+                await self._emit_event(scan_id, TimelineEventType.ACTION, "Accessibility audit started", "Running axe-core analysis")
 
-            t0 = time.time()
-            raw_issues = await self.browser_agent.run_axe_audit(page)
-            audit_ms = int((time.time() - t0) * 1000)
+                t0 = time.time()
+                raw_issues = await self.browser_agent.run_axe_audit(page)
+                audit_ms = int((time.time() - t0) * 1000)
 
-            await self._emit_event(scan_id, TimelineEventType.SUCCESS,
-                                   f"Audit completed — {len(raw_issues)} issues detected",
-                                   f"axe-core analysis took {audit_ms}ms",
-                                   duration_ms=audit_ms)
+                await self._emit_event(scan_id, TimelineEventType.SUCCESS,
+                                       f"Audit completed — {len(raw_issues)} issues detected",
+                                       f"axe-core analysis took {audit_ms}ms",
+                                       duration_ms=audit_ms)
 
-            self._before_issues[scan_id] = raw_issues
+                self._before_issues = {scan_id: raw_issues}
 
-            issues = []
-            for raw in raw_issues:
-                issue = AccessibilityIssue(
-                    id=raw["id"],
-                    rule_id=raw["rule_id"],
-                    rule_description=raw.get("rule_description", ""),
-                    wcag_criteria=raw.get("wcag_criteria", []),
-                    severity=IssueSeverity(raw["severity"]),
-                    axe_impact=raw.get("axe_impact", ""),
-                    element_selector=raw.get("element_selector", ""),
-                    element_html=raw.get("element_html", ""),
-                    description=raw.get("description", ""),
-                    help_url=raw.get("help_url", ""),
-                    before_screenshot=screenshot,
-                )
-                issues.append(issue)
-            scan.issues = issues
-            scan.summary = self._compute_summary(issues)
-            scan.status = ScanStatus.ANALYZING
-            self._save_scan_to_db(scan)
-            await self._emit_event(scan_id, TimelineEventType.ACTION, "AI analysis started", f"Analyzing {len(issues)} issues")
-
-            async def _analyze_issue_task(iss: AccessibilityIssue):
-                try:
-                    dom_context = await self.browser_agent.get_element_context(page, iss.element_selector)
-                    iss.element_context = str(dom_context)[:500]
-
-                    analysis = await self.analysis_agent.analyze_issue(
-                        rule_id=iss.rule_id,
-                        description=iss.description,
-                        severity=iss.severity.value,
-                        element_html=iss.element_html,
-                        selector=iss.element_selector,
-                        dom_context=dom_context,
-                        wcag_criteria=iss.wcag_criteria,
+                issues = []
+                for raw in raw_issues:
+                    issue = AccessibilityIssue(
+                        id=raw["id"],
+                        rule_id=raw["rule_id"],
+                        rule_description=raw.get("rule_description", ""),
+                        wcag_criteria=raw.get("wcag_criteria", []),
+                        severity=IssueSeverity(raw["severity"]),
+                        axe_impact=raw.get("axe_impact", ""),
+                        element_selector=raw.get("element_selector", ""),
+                        element_html=raw.get("element_html", ""),
+                        description=raw.get("description", ""),
+                        help_url=raw.get("help_url", ""),
+                        before_screenshot=screenshot,
                     )
-                    iss.analysis = analysis
-                except Exception as e:
-                    print(f"[Orchestrator] Analysis failed for {iss.id}: {e}")
-
-            # Analyze all issues concurrently in parallel
-            await asyncio.gather(*[_analyze_issue_task(iss) for iss in issues])
-
-            await self._emit_event(scan_id, TimelineEventType.SUCCESS, f"Analysis completed for {len(issues)} issues")
-
-            scan.summary = self._compute_summary(issues)
-            scan.status = ScanStatus.COMPLETE
-            scan.completed_at = datetime.utcnow().isoformat()
-            self._save_scan_to_db(scan)
-
-            await self._emit_event(scan_id, TimelineEventType.SUCCESS,
-                                   "Scan complete",
-                                   f"Found {scan.summary.total_issues} issues: "
-                                   f"{scan.summary.critical} critical, "
-                                   f"{scan.summary.serious} serious, "
-                                   f"{scan.summary.moderate} moderate, "
-                                   f"{scan.summary.minor} minor")
-
-        except Exception as e:
-            if scan:
-                scan.status = ScanStatus.ERROR
+                    issues.append(issue)
+                scan.issues = issues
+                scan.summary = self._compute_summary(issues)
+                scan.status = ScanStatus.ANALYZING
                 self._save_scan_to_db(scan)
-            await self._emit_event(scan_id, TimelineEventType.ERROR, f"Scan failed: {str(e)}")
-            raise
+                await self._emit_event(scan_id, TimelineEventType.ACTION, "AI analysis started", f"Analyzing {len(issues)} issues")
+
+                async def _analyze_issue_task(iss: AccessibilityIssue):
+                    try:
+                        dom_context = await self.browser_agent.get_element_context(page, iss.element_selector)
+                        iss.element_context = str(dom_context)[:500]
+
+                        analysis = await self.analysis_agent.analyze_issue(
+                            rule_id=iss.rule_id,
+                            description=iss.description,
+                            severity=iss.severity.value,
+                            element_html=iss.element_html,
+                            selector=iss.element_selector,
+                            dom_context=dom_context,
+                            wcag_criteria=iss.wcag_criteria,
+                        )
+                        iss.analysis = analysis
+                    except Exception as e:
+                        print(f"[Orchestrator] Analysis failed for {iss.id}: {e}")
+
+                # Analyze all issues concurrently in parallel
+                await asyncio.gather(*[_analyze_issue_task(iss) for iss in issues])
+
+                await self._emit_event(scan_id, TimelineEventType.SUCCESS, f"Analysis completed for {len(issues)} issues")
+
+                scan.summary = self._compute_summary(issues)
+                scan.status = ScanStatus.COMPLETE
+                scan.completed_at = datetime.utcnow().isoformat()
+                self._save_scan_to_db(scan)
+
+                await self._emit_event(scan_id, TimelineEventType.SUCCESS,
+                                       "Scan complete",
+                                       f"Found {scan.summary.total_issues} issues: "
+                                       f"{scan.summary.critical} critical, "
+                                       f"{scan.summary.serious} serious, "
+                                       f"{scan.summary.moderate} moderate, "
+                                       f"{scan.summary.minor} minor")
+
+            except Exception as e:
+                if scan:
+                    scan.status = ScanStatus.ERROR
+                    self._save_scan_to_db(scan)
+                await self._emit_event(scan_id, TimelineEventType.ERROR, f"Scan failed: {str(e)}")
+                raise
+            finally:
+                force_cleanup()
 
     async def fix_issue(self, scan_id: str, issue_id: str) -> Dict[str, Any]:
-        scan = self.get_scan(scan_id)
-        if not scan:
-            return {"success": False, "error": "Scan not found"}
+        async with self._fix_lock:
+            log_memory("fix start")
+            scan = self.get_scan(scan_id)
+            if not scan:
+                return {"success": False, "error": "Scan not found"}
 
-        issue = next((i for i in scan.issues if i.id == issue_id), None)
-        if not issue:
-            return {"success": False, "error": "Issue not found"}
+            issue = next((i for i in scan.issues if i.id == issue_id), None)
+            if not issue:
+                return {"success": False, "error": "Issue not found"}
 
-        page = self._pages.get(scan_id)
-        if not page:
-            return {"success": False, "error": "Browser page not available"}
+            # Re-use active page or restore on-demand for this scan
+            if self._active_scan_id != scan_id or not self._active_page:
+                await self._cleanup_active_page()
+                context = await self.browser_agent.create_context()
+                self._active_context = context
+                self._active_scan_id = scan_id
 
-        issue.status = IssueStatus.FIXING
-        await self._emit_event(scan_id, TimelineEventType.ACTION,
-                               f"Fix started for issue: {issue.rule_id}",
-                               f"Selector: {issue.element_selector}")
+                demo_dir = Path(__file__).resolve().parent.parent / "demo-site"
+                sandbox_file = demo_dir / "sandbox" / scan_id / "index.html"
+                if sandbox_file.exists():
+                    page = await self.browser_agent.load_page(str(sandbox_file), context)
+                else:
+                    page = await self.browser_agent.load_page(scan.url, context)
+                self._active_page = page
+            else:
+                page = self._active_page
 
-        for attempt in range(1, MAX_FIX_ATTEMPTS + 1):
-            await self._emit_event(scan_id, TimelineEventType.INFO, f"Fix attempt {attempt}/{MAX_FIX_ATTEMPTS}")
+            issue.status = IssueStatus.FIXING
+            await self._emit_event(scan_id, TimelineEventType.ACTION,
+                                   f"Fix started for issue: {issue.rule_id}",
+                                   f"Selector: {issue.element_selector}")
 
             try:
-                result = await self._attempt_fix(scan_id, issue, page, attempt)
-                if result["success"]:
-                    return result
-                if attempt < MAX_FIX_ATTEMPTS:
-                    await self._emit_event(scan_id, TimelineEventType.WARNING,
-                                           f"Fix attempt {attempt} failed, retrying...",
-                                           result.get("error", ""))
-            except Exception as e:
-                await self._emit_event(scan_id, TimelineEventType.ERROR, f"Fix attempt {attempt} error: {str(e)}")
+                for attempt in range(1, MAX_FIX_ATTEMPTS + 1):
+                    await self._emit_event(scan_id, TimelineEventType.INFO, f"Fix attempt {attempt}/{MAX_FIX_ATTEMPTS}")
 
-        issue.status = IssueStatus.FAILED
-        await self._emit_event(scan_id, TimelineEventType.ERROR,
-                               f"Fix failed after {MAX_FIX_ATTEMPTS} attempts: {issue.rule_id}",
-                               "NOT VERIFIED — all attempts exhausted")
-        scan.summary = self._compute_summary(scan.issues)
-        return {"success": False, "issue_id": issue_id, "error": "All fix attempts failed"}
+                    try:
+                        result = await self._attempt_fix(scan_id, issue, page, attempt)
+                        if result["success"]:
+                            return result
+                        if attempt < MAX_FIX_ATTEMPTS:
+                            await self._emit_event(scan_id, TimelineEventType.WARNING,
+                                                   f"Fix attempt {attempt} failed, retrying...",
+                                                   result.get("error", ""))
+                    except Exception as e:
+                        await self._emit_event(scan_id, TimelineEventType.ERROR, f"Fix attempt {attempt} error: {str(e)}")
+
+                issue.status = IssueStatus.FAILED
+                await self._emit_event(scan_id, TimelineEventType.ERROR,
+                                       f"Fix failed after {MAX_FIX_ATTEMPTS} attempts: {issue.rule_id}",
+                                       "NOT VERIFIED — all attempts exhausted")
+                scan.summary = self._compute_summary(scan.issues)
+                self._save_scan_to_db(scan)
+                return {"success": False, "issue_id": issue_id, "error": "All fix attempts failed"}
+            finally:
+                force_cleanup()
 
     async def _attempt_fix(self, scan_id: str, issue: AccessibilityIssue, page, attempt: int) -> Dict[str, Any]:
         dom_context = await self.browser_agent.get_element_context(page, issue.element_selector)
@@ -428,6 +482,7 @@ class Orchestrator:
         await self._emit_event(scan_id, TimelineEventType.ACTION, "Re-audit started", "Running axe-core on patched page")
 
         t0 = time.time()
+        log_memory("re-audit")
         after_issues = await self.browser_agent.run_axe_audit(page)
         reaudit_ms = int((time.time() - t0) * 1000)
 
@@ -451,8 +506,9 @@ class Orchestrator:
             render_url = os.getenv("RENDER_EXTERNAL_URL")
             app_url = os.getenv("APP_URL") or os.getenv("BACKEND_URL")
             base_url = render_url.rstrip("/") if render_url else app_url.rstrip("/") if app_url else f"http://localhost:{os.getenv('PORT', '8000')}"
-            scan = self._scans[scan_id]
-            scan.sandbox_url = f"{base_url}/sandbox/{scan_id}"
+            scan = self.get_scan(scan_id)
+            if scan:
+                scan.sandbox_url = f"{base_url}/sandbox/{scan_id}"
             await self._emit_event(scan_id, TimelineEventType.SUCCESS,
                                    f"Fix VERIFIED ✓ — {issue.rule_id}",
                                    verification.details)

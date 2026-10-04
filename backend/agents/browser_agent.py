@@ -17,6 +17,7 @@ from typing import Optional, List, Dict, Any, Callable, Awaitable, Tuple
 from pathlib import Path
 import httpx
 from core.security import extract_demo_filename
+from core.memory import log_memory, force_cleanup
 
 try:
     from playwright.async_api import async_playwright, Page, Browser, BrowserContext
@@ -112,7 +113,18 @@ class BrowserAgent:
                 "--disable-dev-shm-usage",
                 "--disable-gpu",
                 "--no-zygote",
-                "--single-process",
+                "--disable-extensions",
+                "--disable-background-networking",
+                "--disable-default-apps",
+                "--disable-sync",
+                "--mute-audio",
+                "--no-first-run",
+                "--disable-background-timer-throttling",
+                "--disable-backgrounding-occluded-windows",
+                "--disable-renderer-backgrounding",
+                "--disable-ipc-flooding-protection",
+                "--js-flags=--max-old-space-size=128",
+                "--window-size=1280,800",
             ]
             try:
                 # Try system installed Chrome first (fast and reliable on Windows)
@@ -128,22 +140,27 @@ class BrowserAgent:
                     args=chrome_args
                 )
                 print("[BrowserAgent] Playwright Chromium browser launched successfully")
+            log_memory("browser launch")
         except Exception as e:
             print(f"[BrowserAgent] Playwright launch failed: {e}. Switching to HTTP fallback mode.")
             self.use_fallback = True
 
     async def stop(self):
         """Close browser and cleanup."""
+        log_memory("browser close")
         if self._browser:
             try:
                 await self._browser.close()
             except Exception:
                 pass
+            self._browser = None
         if self._playwright:
             try:
                 await self._playwright.stop()
             except Exception:
                 pass
+            self._playwright = None
+        force_cleanup()
 
     async def create_context(self) -> Optional[BrowserContext]:
         """Create a new browser context with reasonable defaults."""
@@ -172,6 +189,7 @@ class BrowserAgent:
             if context and not self.use_fallback:
                 try:
                     page = await context.new_page()
+                    log_memory("page creation")
                     await page.set_content(html, wait_until="domcontentloaded")
                     page.html_content = html
                     page.patched_html = html
@@ -192,10 +210,21 @@ class BrowserAgent:
             return await self._load_page_http_fallback(clean_url)
 
         page = await context.new_page()
+        log_memory("page creation")
         try:
-            await page.goto(clean_url, wait_until="domcontentloaded", timeout=30000)
+            # Block heavy media, images, and fonts to reduce network & memory consumption
+            async def _route_filter(route):
+                if route.request.resource_type in ("image", "media", "font"):
+                    await route.abort()
+                else:
+                    await route.continue_()
+            await page.route("**/*", _route_filter)
+        except Exception:
+            pass
+        try:
+            await page.goto(clean_url, wait_until="domcontentloaded", timeout=20000)
             try:
-                await page.wait_for_load_state("networkidle", timeout=10000)
+                await page.wait_for_load_state("networkidle", timeout=5000)
             except Exception:
                 pass  # networkidle is best-effort; domcontentloaded is sufficient
         except Exception as e:
@@ -400,30 +429,26 @@ class BrowserAgent:
         return f"data:image/svg+xml;base64,{b64}"
 
     async def take_screenshot(self, page: Any, is_patched: bool = False) -> str:
-        """Take a screenshot and return as base64 data URL. Always delivers a real PNG when possible."""
+        """Take a lightweight screenshot and return as base64 data URL. Always delivers real visuals without memory leaks."""
         # 1. Direct Playwright page screenshot if page is a live Page
         if hasattr(page, "screenshot") and not isinstance(page, MockPage):
             try:
-                screenshot_bytes = await page.screenshot(full_page=False, type="png")
+                # Use JPEG with quality 60 to drastically reduce memory usage (20KB vs 500KB)
+                screenshot_bytes = await page.screenshot(full_page=False, type="jpeg", quality=60)
                 if screenshot_bytes:
                     b64 = base64.b64encode(screenshot_bytes).decode("utf-8")
-                    return f"data:image/png;base64,{b64}"
+                    return f"data:image/jpeg;base64,{b64}"
             except Exception as e:
                 print(f"[BrowserAgent] page.screenshot failed: {e}")
 
-        # 2. Render from HTML (works for MockPage, sandboxed HTML, or patched pages)
+        # 2. High-fidelity visual SVG preview of webpage DOM (zero extra browser memory)
         html = getattr(page, "patched_html", getattr(page, "html_content", ""))
-        if html:
-            b64_png = await self._screenshot_from_html(html)
-            if b64_png:
-                return b64_png
-
-        # 3. High-fidelity visual SVG preview of webpage DOM
-        url_label = getattr(page, "url", "https://aura-sandbox.local")
+        url_label = getattr(page, "url", getattr(page, "target_url", "https://aura-sandbox.local"))
         return self._generate_rich_preview_svg(html=html, url=url_label, is_patched=is_patched)
 
     async def run_axe_audit(self, page: Any) -> List[Dict[str, Any]]:
         """Inject axe-core and run accessibility audit. Returns list of violation dicts."""
+        log_memory("axe scan")
         if isinstance(page, MockPage) or self.use_fallback:
             target_html = getattr(page, "patched_html", page.html_content)
             return self._run_static_audit(target_html)

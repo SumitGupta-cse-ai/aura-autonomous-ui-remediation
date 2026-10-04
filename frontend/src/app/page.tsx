@@ -222,11 +222,17 @@ export default function DashboardPage() {
   async function handleFixIssue(issueId: string) {
     if (!currentScanId) return;
     setFixingIssueId(issueId);
+    setError("");
     try {
-      await fixIssue(currentScanId, issueId);
+      const res = await fixIssue(currentScanId, issueId);
+      if (!res.success && res.error) {
+        setError(`Fix attempt: ${res.error}`);
+      }
       await fetchScan(currentScanId);
     } catch (err) {
-      console.error("Fix failed:", err);
+      const errMsg = err instanceof Error ? err.message : "Failed to apply fix";
+      console.error("Fix failed:", errMsg);
+      setError(`Fix failed: ${errMsg}`);
     } finally {
       setFixingIssueId(null);
     }
@@ -236,6 +242,7 @@ export default function DashboardPage() {
   async function handleFixAll() {
     if (!currentScanId) return;
     setIsFixingAll(true);
+    setError("");
     try {
       const currentIssues = scanData?.issues || [];
       const nonFixed = currentIssues.filter((i) => i.status !== "fixed");
@@ -244,16 +251,22 @@ export default function DashboardPage() {
         setSelectedIssue(issue);
         setFixingIssueId(issue.id);
         try {
-          await fixIssue(currentScanId, issue.id);
+          const res = await fixIssue(currentScanId, issue.id);
+          if (!res.success && res.error) {
+            console.warn(`Fix issue ${issue.id}:`, res.error);
+          }
           await fetchScan(currentScanId);
         } catch (e) {
-          console.error(`Fix failed for ${issue.id}:`, e);
+          const errMsg = e instanceof Error ? e.message : "Fix error";
+          console.error(`Fix failed for ${issue.id}:`, errMsg);
         }
         // Brief visual pause so the user sees each fix verify live
         await new Promise((r) => setTimeout(r, 600));
       }
     } catch (err) {
-      console.error("Auto-Fix All failed:", err);
+      const errMsg = err instanceof Error ? err.message : "Auto-Fix All encountered an issue";
+      console.error("Auto-Fix All failed:", errMsg);
+      setError(errMsg);
     } finally {
       setFixingIssueId(null);
       setIsFixingAll(false);
