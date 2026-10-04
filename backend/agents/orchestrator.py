@@ -39,6 +39,7 @@ class Orchestrator:
         self._pages: Dict[str, Any] = {}
         self._contexts: Dict[str, Any] = {}
         self._before_issues: Dict[str, List[Dict]] = {}
+        self._scan_semaphore = asyncio.Semaphore(2)
 
     async def start(self):
         await self.browser_agent.start()
@@ -100,33 +101,45 @@ class Orchestrator:
             await self._emit_event(scan_id, TimelineEventType.ACTION, "Scan started", f"Target: {url}")
             await self._emit_event(scan_id, TimelineEventType.INFO, "URL validated")
 
+            # LRU eviction: close oldest contexts if more than 4 are open to save RAM
+            while len(self._contexts) > 4:
+                old_id = next(iter(self._contexts))
+                old_ctx = self._contexts.pop(old_id, None)
+                if old_ctx and hasattr(old_ctx, "close"):
+                    try:
+                        await old_ctx.close()
+                    except Exception:
+                        pass
+                self._pages.pop(old_id, None)
+
             t0 = time.time()
             scan_mode = "Playwright" if not self.browser_agent.use_fallback else "HTTP fallback"
             await self._emit_event(scan_id, TimelineEventType.ACTION, f"Browser launched ({scan_mode})")
 
-            context = await self.browser_agent.create_context()
-            self._contexts[scan_id] = context
+            async with self._scan_semaphore:
+                context = await self.browser_agent.create_context()
+                self._contexts[scan_id] = context
 
-            try:
-                page = await self.browser_agent.load_page(url, context)
-            except RuntimeError as e:
-                scan.status = ScanStatus.ERROR
-                await self._emit_event(scan_id, TimelineEventType.ERROR,
-                                       f"Failed to load page: {str(e)}",
-                                       "Check that the URL is accessible and the server is running")
-                return
+                try:
+                    page = await self.browser_agent.load_page(url, context)
+                except RuntimeError as e:
+                    scan.status = ScanStatus.ERROR
+                    await self._emit_event(scan_id, TimelineEventType.ERROR,
+                                           f"Failed to load page: {str(e)}",
+                                           "Check that the URL is accessible and the server is running")
+                    return
 
-            self._pages[scan_id] = page
-            load_ms = int((time.time() - t0) * 1000)
+                self._pages[scan_id] = page
+                load_ms = int((time.time() - t0) * 1000)
 
-            # Detect if page content was actually loaded
-            html = getattr(page, "patched_html", "") or getattr(page, "html_content", "")
-            if not html or len(html.strip()) < 20:
-                scan.status = ScanStatus.ERROR
-                await self._emit_event(scan_id, TimelineEventType.ERROR,
-                                       "Page returned empty or minimal content",
-                                       "This may indicate bot protection, authentication, or the page requires JavaScript rendering")
-                return
+                # Detect if page content was actually loaded
+                html = getattr(page, "patched_html", "") or getattr(page, "html_content", "")
+                if not html or len(html.strip()) < 20:
+                    scan.status = ScanStatus.ERROR
+                    await self._emit_event(scan_id, TimelineEventType.ERROR,
+                                           "Page returned empty or minimal content",
+                                           "This may indicate bot protection, authentication, or the page requires JavaScript rendering")
+                    return
 
             await self._emit_event(scan_id, TimelineEventType.SUCCESS,
                                    f"Page loaded ({len(html):,} bytes)",

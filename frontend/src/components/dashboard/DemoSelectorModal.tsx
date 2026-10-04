@@ -47,7 +47,7 @@ export function DemoSelectorModal({
       id: "full_remediation",
       name: "ShopX Full Remediation Demo",
       description: "Featured Judge Demo: Realistic ShopX e-commerce website with 7+ accessibility violations (missing lang, low contrast, unlabelled inputs, unlabelled icon buttons, missing image alt, heading hierarchy skip).",
-      url: `${base}/demo-site/full_remediation.html`,
+      url: "demo-site/full_remediation.html",
       expected_issues: "7+ findings",
       difficulty: "Judge Demo",
       demonstrates: "Full closed-loop agent: Observe -> Reason -> Patch -> Sandbox -> Re-audit -> Verify",
@@ -56,7 +56,7 @@ export function DemoSelectorModal({
       id: "demo1",
       name: "1. Accessibility Basics",
       description: "Standard WCAG accessibility violations (missing alt, no form labels, icon button missing name, heading order skip, low contrast).",
-      url: `${base}/demo-site/demo1.html`,
+      url: "demo-site/demo1.html",
       expected_issues: "5-7 findings",
       difficulty: "Essential",
       demonstrates: "axe-core audit, DOM context analysis, alt-text patching, label association",
@@ -65,7 +65,7 @@ export function DemoSelectorModal({
       id: "demo2",
       name: "2. E-Commerce Shop",
       description: "Realistic shopping page with product cards, category filters, search bar, and cart actions.",
-      url: `${base}/demo-site/demo2.html`,
+      url: "demo-site/demo2.html",
       expected_issues: "6-8 findings",
       difficulty: "Intermediate",
       demonstrates: "Product image vision analysis, search label remediation, cart icon name generation",
@@ -74,7 +74,7 @@ export function DemoSelectorModal({
       id: "demo3",
       name: "3. SaaS Dashboard",
       description: "Cloud infrastructure analytics dashboard with sidebar navigation, metric cards, and data table.",
-      url: `${base}/demo-site/demo3.html`,
+      url: "demo-site/demo3.html",
       expected_issues: "5-7 findings",
       difficulty: "Advanced",
       demonstrates: "Table button ARIA labeling, dark theme contrast audit, avatar alt text fix",
@@ -82,12 +82,18 @@ export function DemoSelectorModal({
   ];
 
   const sourceList = demos.length > 0 ? demos : defaultDemos;
-  const demoList = sourceList.map((d) => ({
-    ...d,
-    url: d.url.includes("/demo-site/")
-      ? `${base}${d.url.substring(d.url.indexOf("/demo-site/"))}`
-      : d.url.replace(/^https?:\/\/(localhost|127\.0\.0\.1):8000/i, base),
-  }));
+  const demoList = sourceList.map((d) => {
+    let cleanUrl = d.url;
+    if (cleanUrl.includes("demo-site/")) {
+      cleanUrl = cleanUrl.substring(cleanUrl.indexOf("demo-site/"));
+    } else if (cleanUrl.match(/^(demo[123]|full_remediation)(\.html)?$/i)) {
+      cleanUrl = `demo-site/${cleanUrl.endsWith(".html") ? cleanUrl : cleanUrl + ".html"}`;
+    }
+    return {
+      ...d,
+      url: cleanUrl,
+    };
+  });
 
   const icons: Record<string, React.ReactNode> = {
     demo1: <FileCode className="w-5 h-5 text-emerald-400" />,

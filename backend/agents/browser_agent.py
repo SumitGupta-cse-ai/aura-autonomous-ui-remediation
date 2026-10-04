@@ -13,9 +13,10 @@ import uuid
 import time
 import re
 import os
-from typing import Optional, List, Dict, Any, Callable, Awaitable
+from typing import Optional, List, Dict, Any, Callable, Awaitable, Tuple
 from pathlib import Path
 import httpx
+from core.security import extract_demo_filename
 
 try:
     from playwright.async_api import async_playwright, Page, Browser, BrowserContext
@@ -29,6 +30,26 @@ except ImportError:
 AXE_CORE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.9.1/axe.min.js"
 AXE_LOCAL_FILE = Path(__file__).resolve().parent.parent / "static" / "axe.min.js"
 AXE_CORE_LOCAL_SCRIPT = AXE_LOCAL_FILE.read_text(encoding="utf-8") if AXE_LOCAL_FILE.exists() else ""
+
+
+def resolve_demo_file(url: str) -> Tuple[Optional[str], Optional[Path]]:
+    """Resolve an offline demo target to (filename, local_path) if available on the server."""
+    demo_file = extract_demo_filename(url)
+    if not demo_file:
+        return None, None
+    candidates = [
+        Path(__file__).resolve().parent.parent / "demo-site" / demo_file,
+        Path(__file__).resolve().parent.parent.parent / "demo-site" / demo_file,
+        Path.cwd() / "backend" / "demo-site" / demo_file,
+        Path.cwd() / "demo-site" / demo_file,
+        Path("/opt/render/project/src/demo-site") / demo_file,
+        Path("/opt/render/project/src/backend/demo-site") / demo_file,
+    ]
+    for c in candidates:
+        if c.exists():
+            return demo_file, c
+    return demo_file, None
+
 
 SEVERITY_MAP = {
     "critical": "critical",
@@ -85,18 +106,26 @@ class BrowserAgent:
 
         try:
             self._playwright = await async_playwright().start()
+            chrome_args = [
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--no-zygote",
+                "--single-process",
+            ]
             try:
                 # Try system installed Chrome first (fast and reliable on Windows)
                 self._browser = await self._playwright.chromium.launch(
                     channel="chrome",
                     headless=True,
-                    args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"]
+                    args=chrome_args
                 )
                 print("[BrowserAgent] Launched system Chrome successfully")
             except Exception:
                 self._browser = await self._playwright.chromium.launch(
                     headless=True,
-                    args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"]
+                    args=chrome_args
                 )
                 print("[BrowserAgent] Playwright Chromium browser launched successfully")
         except Exception as e:
@@ -133,27 +162,24 @@ class BrowserAgent:
         self, url: str, context: Optional[BrowserContext] = None
     ) -> Any:
         """Load a page with proper timeouts and wait for readiness.
-        Works for: demo sites, localhost dev servers, and public HTTPS websites.
+        Works for: built-in offline demo sites, localhost dev servers, and public HTTPS websites.
         """
-        # 1. Built-in demo site direct resolution (guarantees 100% success on any port/cloud)
-        if "/demo-site/" in url:
-            filename = url.split("/demo-site/")[-1].split("?")[0].split("#")[0]
-            demo_dir = Path(__file__).resolve().parent.parent.parent / "demo-site"
-            local_file = demo_dir / filename
-            if not local_file.exists():
-                local_file = Path(__file__).resolve().parent.parent / "demo-site" / filename
-            if local_file.exists():
-                html = local_file.read_text(encoding="utf-8")
-                if context and not self.use_fallback:
-                    try:
-                        page = await context.new_page()
-                        await page.set_content(html, wait_until="domcontentloaded")
-                        page.html_content = html
-                        page.patched_html = html
-                        return page
-                    except Exception:
-                        pass
-                return MockPage(url=url, html_content=html)
+        # 1. Built-in offline demo site internal resolution (100% offline, zero network requests)
+        demo_name, local_file = resolve_demo_file(url)
+        if demo_name and local_file:
+            html = local_file.read_text(encoding="utf-8")
+            canonical_demo_url = f"https://aura-bundled-demo.local/demo-site/{demo_name}"
+            if context and not self.use_fallback:
+                try:
+                    page = await context.new_page()
+                    await page.set_content(html, wait_until="domcontentloaded")
+                    page.html_content = html
+                    page.patched_html = html
+                    page.target_url = canonical_demo_url
+                    return page
+                except Exception as pe:
+                    print(f"[BrowserAgent] Playwright set_content failed: {pe}, using MockPage")
+            return MockPage(url=canonical_demo_url, html_content=html)
 
         # 2. Port rewrite for cloud deployment (e.g. Render where PORT is not 8000)
         current_port = os.getenv("PORT", "8000")
@@ -193,15 +219,10 @@ class BrowserAgent:
 
     async def _load_page_http_fallback(self, url: str) -> MockPage:
         """HTTP fallback for loading pages when Playwright is unavailable."""
-        if "/demo-site/" in url:
-            filename = url.split("/demo-site/")[-1].split("?")[0].split("#")[0]
-            demo_dir = Path(__file__).resolve().parent.parent.parent / "demo-site"
-            local_file = demo_dir / filename
-            if not local_file.exists():
-                local_file = Path(__file__).resolve().parent.parent / "demo-site" / filename
-            if local_file.exists():
-                html = local_file.read_text(encoding="utf-8")
-                return MockPage(url=url, html_content=html)
+        demo_name, local_file = resolve_demo_file(url)
+        if demo_name and local_file:
+            html = local_file.read_text(encoding="utf-8")
+            return MockPage(url=f"https://aura-bundled-demo.local/demo-site/{demo_name}", html_content=html)
 
         current_port = os.getenv("PORT", "8000")
         clean_url = url
@@ -223,20 +244,12 @@ class BrowserAgent:
                 page = MockPage(url=clean_url, html_content=resp.text)
                 return page
         except httpx.TimeoutException:
-            if "/demo-site/" in url:
-                filename = url.split("/demo-site/")[-1].split("?")[0].split("#")[0]
-                demo_dir = Path(__file__).resolve().parent.parent.parent / "demo-site"
-                local_file = demo_dir / filename
-                if local_file.exists():
-                    return MockPage(url=url, html_content=local_file.read_text(encoding="utf-8"))
+            if demo_name and local_file:
+                return MockPage(url=f"https://aura-bundled-demo.local/demo-site/{demo_name}", html_content=local_file.read_text(encoding="utf-8"))
             raise RuntimeError(f"Timeout loading {clean_url} — site did not respond within 20 seconds")
         except httpx.ConnectError as e:
-            if "/demo-site/" in url:
-                filename = url.split("/demo-site/")[-1].split("?")[0].split("#")[0]
-                demo_dir = Path(__file__).resolve().parent.parent.parent / "demo-site"
-                local_file = demo_dir / filename
-                if local_file.exists():
-                    return MockPage(url=url, html_content=local_file.read_text(encoding="utf-8"))
+            if demo_name and local_file:
+                return MockPage(url=f"https://aura-bundled-demo.local/demo-site/{demo_name}", html_content=local_file.read_text(encoding="utf-8"))
             raise RuntimeError(f"Could not connect to {clean_url} — {e}")
         except httpx.HTTPStatusError as e:
             raise RuntimeError(f"HTTP {e.response.status_code} from {clean_url} — {e.response.reason_phrase}")
@@ -756,16 +769,22 @@ class BrowserAgent:
             page.patched_html = patched_html
 
             try:
-                demo_dir = Path(__file__).resolve().parent.parent.parent / "demo-site"
-                demo_dir.mkdir(parents=True, exist_ok=True)
-                if scan_id:
-                    sandbox_dir = demo_dir / "sandbox" / scan_id
-                    sandbox_dir.mkdir(parents=True, exist_ok=True)
-                    sandbox_file = sandbox_dir / "index.html"
-                else:
-                    sandbox_file = demo_dir / "sandbox_preview.html"
-                with open(sandbox_file, "w", encoding="utf-8") as f:
-                    f.write(patched_html)
+                for base_dir in [
+                    Path(__file__).resolve().parent.parent / "demo-site",
+                    Path(__file__).resolve().parent.parent.parent / "demo-site",
+                ]:
+                    try:
+                        base_dir.mkdir(parents=True, exist_ok=True)
+                        if scan_id:
+                            sandbox_dir = base_dir / "sandbox" / scan_id
+                            sandbox_dir.mkdir(parents=True, exist_ok=True)
+                            sandbox_file = sandbox_dir / "index.html"
+                        else:
+                            sandbox_file = base_dir / "sandbox_preview.html"
+                        with open(sandbox_file, "w", encoding="utf-8") as f:
+                            f.write(patched_html)
+                    except Exception:
+                        pass
             except Exception:
                 pass
 

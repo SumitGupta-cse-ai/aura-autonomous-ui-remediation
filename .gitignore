@@ -1,4 +1,4 @@
-﻿# Root gitignore for AURA
+# Root gitignore for AURA
 node_modules/
 .next/
 out/
@@ -15,5 +15,7 @@ __pycache__/
 *.log
 *.zip
 demo-site/sandbox/
+backend/demo-site/sandbox/
+backend/**/__pycache__/
 .vscode/
 .idea/

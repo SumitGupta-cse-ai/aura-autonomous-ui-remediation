@@ -100,6 +100,8 @@ def get_backend_base_url() -> str:
 
 # Serve demo site static files
 demo_site_path = Path(__file__).resolve().parent.parent / "demo-site"
+if not (demo_site_path / "demo1.html").exists():
+    demo_site_path = Path(__file__).resolve().parent / "demo-site"
 demo_site_path.mkdir(parents=True, exist_ok=True)
 if demo_site_path.exists():
     app.mount("/demo-site", StaticFiles(directory=str(demo_site_path), html=True), name="demo-site")
@@ -288,14 +290,24 @@ async def get_demo_sites():
 @app.get("/sandbox/{scan_id}")
 async def serve_sandbox(scan_id: str):
     """Serve the sandboxed patched page for a scan."""
-    sandbox_file = demo_site_path / "sandbox" / scan_id / "index.html"
-    if not sandbox_file.exists():
-        # Fallback to single sandbox preview if exists
-        fallback = demo_site_path / "sandbox_preview.html"
-        if fallback.exists():
-            return FileResponse(str(fallback), media_type="text/html")
-        raise HTTPException(status_code=404, detail="Sandbox preview not available yet")
-    return FileResponse(str(sandbox_file), media_type="text/html")
+    candidates = [
+        demo_site_path / "sandbox" / scan_id / "index.html",
+        Path(__file__).resolve().parent / "demo-site" / "sandbox" / scan_id / "index.html",
+        Path(__file__).resolve().parent.parent / "demo-site" / "sandbox" / scan_id / "index.html",
+    ]
+    for c in candidates:
+        if c.exists():
+            return FileResponse(str(c), media_type="text/html")
+    # Fallback to single sandbox preview if exists
+    fallbacks = [
+        demo_site_path / "sandbox_preview.html",
+        Path(__file__).resolve().parent / "demo-site" / "sandbox_preview.html",
+        Path(__file__).resolve().parent.parent / "demo-site" / "sandbox_preview.html",
+    ]
+    for fb in fallbacks:
+        if fb.exists():
+            return FileResponse(str(fb), media_type="text/html")
+    raise HTTPException(status_code=404, detail="Sandbox preview not available yet")
 
 
 @app.get("/api/scan/{scan_id}/diff/{issue_id}")

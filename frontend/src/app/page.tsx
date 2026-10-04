@@ -151,16 +151,14 @@ export default function DashboardPage() {
     setScanLoading(true);
 
     let targetUrl = url.trim();
-    const base = getApiBase();
     if (!targetUrl) {
-      targetUrl = `${base}/demo-site/full_remediation.html`;
+      targetUrl = "demo-site/full_remediation.html";
       setUrl(targetUrl);
-    } else if (targetUrl.includes("/demo-site/")) {
-      const demoPath = targetUrl.substring(targetUrl.indexOf("/demo-site/"));
-      targetUrl = `${base}${demoPath}`;
+    } else if (targetUrl.includes("demo-site/")) {
+      targetUrl = targetUrl.substring(targetUrl.indexOf("demo-site/"));
       setUrl(targetUrl);
-    } else if (targetUrl.match(/^https?:\/\/(localhost|127\.0\.0\.1):8000/i)) {
-      targetUrl = targetUrl.replace(/^https?:\/\/(localhost|127\.0\.0\.1):8000/i, base);
+    } else if (targetUrl.match(/^(demo[123]|full_remediation)(\.html)?$/i)) {
+      targetUrl = `demo-site/${targetUrl.endsWith(".html") ? targetUrl : targetUrl + ".html"}`;
       setUrl(targetUrl);
     }
 
@@ -184,13 +182,11 @@ export default function DashboardPage() {
 
   // Handle Selection of a specific Demo Site
   async function handleSelectDemoSite(demoUrl: string) {
-    let targetUrl = demoUrl;
-    const base = getApiBase();
-    if (targetUrl.includes("/demo-site/")) {
-      const demoPath = targetUrl.substring(targetUrl.indexOf("/demo-site/"));
-      targetUrl = `${base}${demoPath}`;
-    } else if (targetUrl.match(/^https?:\/\/(localhost|127\.0\.0\.1):8000/i)) {
-      targetUrl = targetUrl.replace(/^https?:\/\/(localhost|127\.0\.0\.1):8000/i, base);
+    let targetUrl = demoUrl.trim();
+    if (targetUrl.includes("demo-site/")) {
+      targetUrl = targetUrl.substring(targetUrl.indexOf("demo-site/"));
+    } else if (targetUrl.match(/^(demo[123]|full_remediation)(\.html)?$/i)) {
+      targetUrl = `demo-site/${targetUrl.endsWith(".html") ? targetUrl : targetUrl + ".html"}`;
     }
 
     // Immediately close modal and show loading in scanner

@@ -5,7 +5,7 @@ import os
 import re
 import socket
 from urllib.parse import urlparse
-from typing import Tuple
+from typing import Tuple, Optional
 
 # When AURA_ALLOW_LOCAL is true (default), localhost / private-IP scanning is
 # permitted.  Set AURA_ALLOW_LOCAL=false in production cloud deployments to
@@ -34,12 +34,43 @@ ALWAYS_BLOCKED_HOSTNAMES = [
 BLOCKED_TLD = [".internal"]
 
 
+def extract_demo_filename(url: str) -> Optional[str]:
+    """Returns filename like 'demo1.html' if url refers to any built-in offline demo site."""
+    if not url:
+        return None
+    cleaned = url.strip()
+    # Patterns: demo:demo1, demo/demo1, demo:demo1.html
+    m = re.match(r"^demo[:/](demo[123]|full_remediation|index)(?:\.html)?$", cleaned, re.I)
+    if m:
+        return f"{m.group(1).lower()}.html"
+    # Bare demo identifiers
+    lower = cleaned.lower()
+    if lower in ("demo1", "demo2", "demo3", "full_remediation", "index"):
+        return f"{lower}.html"
+    if lower in ("demo1.html", "demo2.html", "demo3.html", "full_remediation.html", "index.html"):
+        return lower
+    # URLs or relative paths containing demo-site
+    if "demo-site" in lower:
+        part = lower.split("demo-site")[-1].lstrip("/\\")
+        filename = part.split("?")[0].split("#")[0]
+        if filename in ("demo1.html", "demo2.html", "demo3.html", "full_remediation.html", "index.html"):
+            return filename
+        if filename in ("demo1", "demo2", "demo3", "full_remediation", "index"):
+            return f"{filename}.html"
+    return None
+
+
 def validate_url(url: str) -> Tuple[bool, str]:
     """Validate URL for safety. Returns (is_valid, cleaned_url_or_error)."""
     if not url or not url.strip():
         return False, "URL is required"
 
     url = url.strip()
+
+    # 1. Built-in Offline Demo Site internal resolution (100% safe, no external network needed)
+    demo_file = extract_demo_filename(url)
+    if demo_file:
+        return True, f"demo-site/{demo_file}"
 
     # Must have scheme
     if not url.startswith(("http://", "https://")):

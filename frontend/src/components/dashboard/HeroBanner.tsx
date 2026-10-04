@@ -65,12 +65,12 @@ export function HeroBanner({
         </div>
 
         {/* URL Scanner Input */}
-        <form onSubmit={onScan} className="w-full mb-3">
+        <form onSubmit={onScan} noValidate className="w-full mb-3">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748b]" />
               <input
-                type="url"
+                type="text"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://example.com or select a test site below"
@@ -105,7 +105,7 @@ export function HeroBanner({
           </span>
           <button
             type="button"
-            onClick={() => onQuickScan?.("https://aura-autonomous-ui-remediation.onrender.com/demo-site/full_remediation.html")}
+            onClick={() => onQuickScan?.("demo-site/full_remediation.html")}
             disabled={loading}
             className="px-2.5 py-1 rounded-lg bg-[#16202c] hover:bg-emerald-500/20 border border-[#1e293b] hover:border-emerald-500/40 text-[11px] font-semibold text-emerald-400 transition-all flex items-center gap-1 cursor-pointer"
             title="Featured Judge Demo with 7+ accessibility violations"
@@ -115,7 +115,7 @@ export function HeroBanner({
           </button>
           <button
             type="button"
-            onClick={() => onQuickScan?.("https://aura-autonomous-ui-remediation.onrender.com/demo-site/demo1.html")}
+            onClick={() => onQuickScan?.("demo-site/demo1.html")}
             disabled={loading}
             className="px-2.5 py-1 rounded-lg bg-[#16202c] hover:bg-blue-500/20 border border-[#1e293b] hover:border-blue-500/40 text-[11px] font-medium text-[#94a3b8] hover:text-white transition-all cursor-pointer"
           >

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<!-- INTENTIONALLY MISSING lang ATTRIBUTE — WCAG 3.1.1 violation -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AURA Accessibility Demo — Basics</title>
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: #f8fafc; color: #1e293b; line-height: 1.6; }
+        *:focus { outline: none; } /* INTENTIONAL: Remove focus outline - WCAG 2.4.7 */
+
+        .banner { background: #0f172a; color: #f59e0b; text-align: center; padding: 10px 16px; font-size: 13px; font-weight: 600; }
+        nav { background: #ffffff; border-bottom: 1px solid #e2e8f0; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; }
+        .logo { font-size: 20px; font-weight: 700; color: #0f766e; }
+        .nav-links { display: flex; gap: 20px; align-items: center; }
+        .nav-links a { text-decoration: none; color: #475569; font-size: 14px; font-weight: 500; }
+        
+        .icon-btn { background: none; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; cursor: pointer; }
+        .icon-btn svg { width: 18px; height: 18px; color: #475569; }
+
+        .hero { background: linear-gradient(135deg, #0f766e, #14b8a6); color: white; padding: 64px 32px; text-align: center; }
+        .hero h1 { font-size: 40px; font-weight: 800; margin-bottom: 12px; }
+        .hero p { font-size: 16px; opacity: 0.9; max-width: 600px; margin: 0 auto; }
+
+        .section { padding: 48px 32px; max-width: 1100px; margin: 0 auto; }
+        .section-title { font-size: 28px; font-weight: 700; color: #0f172a; margin-bottom: 6px; }
+        .low-contrast { color: #cbd5e1; } /* INTENTIONAL: Low contrast - WCAG 1.4.3 */
+
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 32px; }
+        .card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }
+        .card-img { width: 100%; height: 180px; background: #ccfbf1; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #0f766e; }
+        .card-body { padding: 20px; }
+        .card-body h4 { font-size: 18px; margin-bottom: 6px; }
+
+        .form-section { background: #f0fdf4; padding: 40px 32px; text-align: center; margin-top: 40px; }
+        .form-container { max-width: 440px; margin: 20px auto 0; flex; gap: 12px; }
+        .form-container input { flex: 1; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; }
+        .form-container button { background: #0f766e; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+
+        footer { background: #0f172a; color: #94a3b8; padding: 32px; text-align: center; margin-top: 64px; }
+    </style>
+</head>
+<body>
+    <div class="banner">
+        ⚠️ AURA Demo 1 — Accessibility Basics Test Page
+    </div>
+
+    <nav>
+        <span class="logo">🌿 GreenField Basics</span>
+        <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#contact">Contact</a>
+            <!-- INTENTIONAL: Button without accessible name (WCAG 4.1.2) -->
+            <button class="icon-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+            </button>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <h1>Sustainable Farming & Produce</h1>
+        <p>Pure organic farm products delivered directly to your doorstep.</p>
+    </section>
+
+    <!-- INTENTIONAL: Heading hierarchy skip (h1 -> h4) (WCAG 1.3.1) -->
+    <section class="section" id="features">
+        <h4 class="section-title">Our Harvest Highlights</h4>
+        <p class="low-contrast">Farm fresh ingredients picked daily by local farmers.</p>
+
+        <div class="grid">
+            <div class="card">
+                <!-- INTENTIONAL: Image missing alt attribute (WCAG 1.1.1) -->
+                <div class="card-img">Fresh Organic Tomatoes</div>
+                <div class="card-body">
+                    <h4>Roma Tomatoes</h4>
+                    <p style="color: #64748b; font-size: 14px;">$4.99 / lb</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-img">Baby Spinach</div>
+                <div class="card-body">
+                    <h4>Baby Spinach</h4>
+                    <p style="color: #64748b; font-size: 14px;">$3.49 / bunch</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-img">Sweet Corn</div>
+                <div class="card-body">
+                    <h4>Golden Sweet Corn</h4>
+                    <p style="color: #64748b; font-size: 14px;">$2.99 / 4 ears</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="form-section" id="contact">
+        <h3>Subscribe to Harvest Alerts</h3>
+        <form class="form-container" onsubmit="return false;">
+            <!-- INTENTIONAL: Input without label (WCAG 1.3.1 / 4.1.2) -->
+            <input type="email" placeholder="Enter your email address">
+            <button type="submit">Subscribe</button>
+        </form>
+    </section>
+
+    <footer>
+        <p>&copy; 2024 GreenField Basics Demo.</p>
+        <!-- INTENTIONAL: Link wrapping SVG icon without text/aria-label (WCAG 4.1.2) -->
+        <a href="/social" style="display:inline-block; margin-top:12px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="#94a3b8">
+                <path d="M22.46 6c-.85.38-1.78.64-2.73.76 1-.6 1.76-1.54 2.12-2.67-.93.55-1.96.95-3.06 1.17-.88-.94-2.13-1.53-3.51-1.53-2.66 0-4.81 2.16-4.81 4.81 0 .38.04.75.13 1.1-4-.2-7.58-2.11-9.96-5.02-.42.72-.66 1.56-.66 2.46 0 1.68.85 3.16 2.14 4.02-.79-.02-1.53-.24-2.18-.6v.06c0 2.35 1.67 4.31 3.88 4.76-.4.1-.83.16-1.27.16-.31 0-.62-.03-.92-.08.63 1.96 2.45 3.39 4.6 3.43-1.68 1.32-3.81 2.1-6.12 2.1-.4 0-.79-.02-1.17-.07 2.19 1.4 4.78 2.22 7.57 2.22 9.07 0 14.02-7.52 14.02-14.02 0-.21 0-.42-.01-.63.96-.7 1.8-1.56 2.46-2.55z"/>
+            </svg>
+        </a>
+    </footer>
+</body>
+</html>
