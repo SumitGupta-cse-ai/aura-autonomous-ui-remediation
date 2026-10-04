@@ -16,6 +16,7 @@ import {
   HelpCircle,
   Sparkles,
   ChevronRight,
+  X,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -23,6 +24,8 @@ interface SidebarProps {
   fixedCount?: number;
   onNewScanClick?: () => void;
   onDemoClick?: () => void;
+  mobileOpen?: boolean;
+  onClose?: () => void;
 }
 
 export function Sidebar({
@@ -30,6 +33,8 @@ export function Sidebar({
   fixedCount = 0,
   onNewScanClick,
   onDemoClick,
+  mobileOpen = false,
+  onClose,
 }: SidebarProps) {
   const pathname = usePathname();
 
@@ -79,24 +84,39 @@ export function Sidebar({
     { label: "Documentation", icon: BookOpen, href: "#docs" },
   ];
 
-  return (
-    <aside className="w-64 bg-[#0d151e] border-r border-[#1e293b] flex flex-col justify-between h-screen sticky top-0 flex-shrink-0 z-30 select-none">
+  const sidebarContent = (
+    <div className="flex flex-col justify-between h-full">
       {/* Top Branding & Main Nav */}
       <div className="p-4 flex flex-col gap-6 overflow-y-auto">
-        {/* Brand Logo */}
-        <Link href="/" className="flex items-center gap-3 px-2 py-1 group">
-          <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:bg-emerald-500/30 transition-all aura-glow-sm">
-            <Shield className="w-5 h-5 text-emerald-400" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-lg font-bold tracking-tight text-white group-hover:text-emerald-400 transition-colors flex items-center gap-1">
-              AURA
-            </span>
-            <span className="text-[10px] text-[#94a3b8] font-medium leading-none">
-              Autonomous UI Remediation
-            </span>
-          </div>
-        </Link>
+        {/* Brand Logo & Close button for mobile */}
+        <div className="flex items-center justify-between">
+          <Link
+            href="/"
+            onClick={onClose}
+            className="flex items-center gap-3 px-2 py-1 group"
+          >
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:bg-emerald-500/30 transition-all aura-glow-sm">
+              <Shield className="w-5 h-5 text-emerald-400" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-lg font-bold tracking-tight text-white group-hover:text-emerald-400 transition-colors flex items-center gap-1">
+                AURA
+              </span>
+              <span className="text-[10px] text-[#94a3b8] font-medium leading-none">
+                Autonomous UI Remediation
+              </span>
+            </div>
+          </Link>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="lg:hidden p-1.5 rounded-lg text-[#94a3b8] hover:text-white hover:bg-[#16202c]"
+              aria-label="Close menu"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+        </div>
 
         {/* Navigation Section */}
         <div className="flex flex-col gap-1">
@@ -110,7 +130,10 @@ export function Sidebar({
               return (
                 <button
                   key={item.label}
-                  onClick={item.action}
+                  onClick={() => {
+                    item.action?.();
+                    onClose?.();
+                  }}
                   className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium text-[#94a3b8] hover:text-white hover:bg-[#16202c] transition-all group"
                 >
                   <div className="flex items-center gap-2.5">
@@ -125,6 +148,7 @@ export function Sidebar({
               <a
                 key={item.label}
                 href={item.href || "#"}
+                onClick={onClose}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all group ${
                   item.active
                     ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-semibold"
@@ -164,7 +188,10 @@ export function Sidebar({
               return (
                 <button
                   key={link.label}
-                  onClick={link.onClick}
+                  onClick={() => {
+                    link.onClick?.();
+                    onClose?.();
+                  }}
                   className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-[#94a3b8] hover:text-white hover:bg-[#16202c] transition-all group"
                 >
                   <div className="flex items-center gap-2.5">
@@ -179,6 +206,7 @@ export function Sidebar({
               <a
                 key={link.label}
                 href={link.href || "#"}
+                onClick={onClose}
                 className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-[#94a3b8] hover:text-white hover:bg-[#16202c] transition-all group"
               >
                 <div className="flex items-center gap-2.5">
@@ -205,6 +233,30 @@ export function Sidebar({
           </p>
         </div>
       </div>
-    </aside>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop Sticky Sidebar */}
+      <aside className="hidden lg:flex w-64 bg-[#0d151e] border-r border-[#1e293b] flex-col justify-between h-screen sticky top-0 flex-shrink-0 z-30 select-none">
+        {sidebarContent}
+      </aside>
+
+      {/* Mobile Drawer Backdrop & Panel */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
+            onClick={onClose}
+          />
+          {/* Slide-out drawer */}
+          <aside className="fixed inset-y-0 left-0 w-72 max-w-[85vw] bg-[#0d151e] border-r border-[#1e293b] flex flex-col z-50 shadow-2xl animate-in slide-in-from-left duration-200">
+            {sidebarContent}
+          </aside>
+        </div>
+      )}
+    </>
   );
 }

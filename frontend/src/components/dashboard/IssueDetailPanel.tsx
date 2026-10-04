@@ -108,7 +108,7 @@ export function IssueDetailPanel({
         <h2 className="text-base font-bold text-white">{issue.description}</h2>
 
         {/* Tab Navigation */}
-        <div className="flex items-center gap-1 border-b border-[#1e293b] -mb-4 pt-1">
+        <div className="flex items-center gap-1 border-b border-[#1e293b] -mb-4 pt-1 overflow-x-auto scrollbar-none flex-nowrap">
           {(
             [
               ["overview", "Overview"],
@@ -121,7 +121,7 @@ export function IssueDetailPanel({
             <button
               key={key}
               onClick={() => setActiveTab(key)}
-              className={`px-3 py-2 text-xs font-medium border-b-2 transition-all ${
+              className={`px-3 py-2 text-xs font-medium border-b-2 transition-all whitespace-nowrap flex-shrink-0 ${
                 activeTab === key
                   ? "border-emerald-500 text-emerald-400 font-semibold"
                   : "border-transparent text-[#94a3b8] hover:text-white"

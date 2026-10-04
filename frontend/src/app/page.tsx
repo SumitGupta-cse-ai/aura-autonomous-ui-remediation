@@ -28,7 +28,7 @@ import type {
   TimelineEvent,
   ScanReport,
 } from "@/lib/types";
-import { History, Globe, Clock, ArrowRight, CheckCircle2, AlertCircle } from "lucide-react";
+import { History, Globe, Clock, ArrowRight, CheckCircle2, AlertCircle, Scan, Eye, FileText, Sparkles } from "lucide-react";
 
 export default function DashboardPage() {
   const [url, setUrl] = useState("");
@@ -48,6 +48,8 @@ export default function DashboardPage() {
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
   const [demoOptions, setDemoOptions] = useState<DemoSiteOption[]>([]);
   const [loadingDemoId, setLoadingDemoId] = useState<string | null>(null);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [mobileActiveView, setMobileActiveView] = useState<"issues" | "detail" | "visualizer" | "all">("all");
 
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -278,15 +280,21 @@ export default function DashboardPage() {
 
   return (
     <div className="flex min-h-screen bg-[#0b1117] text-[#f8fafc] transition-colors duration-150">
-      {/* Left Sidebar */}
+      {/* Left Sidebar (Desktop sticky + Mobile slide-out drawer) */}
       <Sidebar
         unresolvedCount={unresolvedCount}
         fixedCount={fixedCount}
         onNewScanClick={() => {
           const scannerEl = document.getElementById("scanner");
           scannerEl?.scrollIntoView({ behavior: "smooth" });
+          setMobileSidebarOpen(false);
         }}
-        onDemoClick={handleOpenDemoModal}
+        onDemoClick={() => {
+          handleOpenDemoModal();
+          setMobileSidebarOpen(false);
+        }}
+        mobileOpen={mobileSidebarOpen}
+        onClose={() => setMobileSidebarOpen(false)}
       />
 
       {/* Main Content Area */}
@@ -295,10 +303,11 @@ export default function DashboardPage() {
         <TopHeader
           currentUrl={scanData?.url}
           onDemoClick={handleOpenDemoModal}
+          onToggleMobileMenu={() => setMobileSidebarOpen((prev) => !prev)}
         />
 
         {/* Dashboard Main Content Body */}
-        <main className="p-6 flex flex-col gap-6 max-w-[1600px] w-full mx-auto">
+        <main className="p-3 sm:p-6 pb-24 lg:pb-8 flex flex-col gap-6 max-w-[1600px] w-full mx-auto">
           {/* Section 1: Hero Banner & URL Scanner */}
           <div id="scanner">
             <HeroBanner
@@ -324,43 +333,122 @@ export default function DashboardPage() {
             status={scanData?.status}
           />
 
-          {/* Section 4: Main Dashboard Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch min-h-[550px]">
-            {/* Left Column: Issue Explorer */}
-            <div className="lg:col-span-4 min-h-[500px]">
-              <IssueExplorer
-                issues={issues}
-                selectedIssueId={selectedIssue?.id}
-                onSelectIssue={(issue) => setSelectedIssue(issue)}
-                onFixIssue={handleFixIssue}
-                fixingIssueId={fixingIssueId}
-                filter={filter}
-                setFilter={setFilter}
-                onFixAll={handleFixAll}
-                isFixingAll={isFixingAll}
-              />
+          {/* Section 4: Main Dashboard Workbench Grid */}
+          <div className="space-y-3" id="issues-section">
+            {/* Mobile View Selector Tabs (< lg screens) */}
+            <div className="flex lg:hidden items-center justify-between bg-[#0f1720] border border-[#1e293b] p-1 rounded-xl">
+              <div className="flex items-center gap-1 w-full">
+                <button
+                  onClick={() => setMobileActiveView("issues")}
+                  className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                    mobileActiveView === "issues"
+                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                      : "text-[#94a3b8]"
+                  }`}
+                >
+                  <span>1. Issues</span>
+                  <span className="text-[10px] px-1.5 py-0.2 bg-black/40 rounded-full font-mono text-emerald-300">
+                    {issues.length}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setMobileActiveView("detail")}
+                  className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                    mobileActiveView === "detail"
+                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                      : "text-[#94a3b8]"
+                  }`}
+                >
+                  <span>2. Details</span>
+                </button>
+
+                <button
+                  onClick={() => setMobileActiveView("visualizer")}
+                  className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                    mobileActiveView === "visualizer"
+                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                      : "text-[#94a3b8]"
+                  }`}
+                >
+                  <span>3. Visualizer</span>
+                </button>
+
+                <button
+                  onClick={() => setMobileActiveView("all")}
+                  className={`py-2 px-2.5 rounded-lg text-xs font-semibold transition-all ${
+                    mobileActiveView === "all"
+                      ? "bg-[#1e293b] text-white"
+                      : "text-[#64748b]"
+                  }`}
+                  title="Show all panels stacked"
+                >
+                  <span>All</span>
+                </button>
+              </div>
             </div>
 
-            {/* Middle Column: Issue Detail Panel */}
-            <div className="lg:col-span-4 min-h-[500px]">
-              <IssueDetailPanel
-                issue={selectedIssue}
-                onFix={handleFixIssue}
-                isFixing={fixingIssueId === selectedIssue?.id}
-                scanId={currentScanId || undefined}
-              />
-            </div>
+            {/* Main Workbench Grid (Side-by-side on desktop, responsive tab-aware on mobile) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch min-h-[550px]">
+              {/* Left Column: Issue Explorer */}
+              <div
+                className={`lg:col-span-4 min-h-[480px] ${
+                  mobileActiveView !== "all" && mobileActiveView !== "issues"
+                    ? "hidden lg:block"
+                    : "block"
+                }`}
+              >
+                <IssueExplorer
+                  issues={issues}
+                  selectedIssueId={selectedIssue?.id}
+                  onSelectIssue={(issue) => {
+                    setSelectedIssue(issue);
+                    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+                      setMobileActiveView("detail");
+                    }
+                  }}
+                  onFixIssue={handleFixIssue}
+                  fixingIssueId={fixingIssueId}
+                  filter={filter}
+                  setFilter={setFilter}
+                  onFixAll={handleFixAll}
+                  isFixingAll={isFixingAll}
+                />
+              </div>
 
-            {/* Right Column: Before / After Visualizer */}
-            <div className="lg:col-span-4 min-h-[500px]">
-              <BeforeAfterComparison
-                selectedIssue={selectedIssue}
-                onDownloadPatch={handleDownloadPatch}
-                onViewReport={handleViewReport}
-                scanId={currentScanId || undefined}
-                targetUrl={scanData?.url}
-                isFixing={fixingIssueId === selectedIssue?.id || isFixingAll}
-              />
+              {/* Middle Column: Issue Detail Panel */}
+              <div
+                className={`lg:col-span-4 min-h-[480px] ${
+                  mobileActiveView !== "all" && mobileActiveView !== "detail"
+                    ? "hidden lg:block"
+                    : "block"
+                }`}
+              >
+                <IssueDetailPanel
+                  issue={selectedIssue}
+                  onFix={handleFixIssue}
+                  isFixing={fixingIssueId === selectedIssue?.id}
+                  scanId={currentScanId || undefined}
+                />
+              </div>
+
+              {/* Right Column: Before / After Visualizer */}
+              <div
+                className={`lg:col-span-4 min-h-[480px] ${
+                  mobileActiveView !== "all" && mobileActiveView !== "visualizer"
+                    ? "hidden lg:block"
+                    : "block"
+                }`}
+              >
+                <BeforeAfterComparison
+                  selectedIssue={selectedIssue}
+                  onDownloadPatch={handleDownloadPatch}
+                  onViewReport={handleViewReport}
+                  scanId={currentScanId || undefined}
+                  targetUrl={scanData?.url}
+                  isFixing={fixingIssueId === selectedIssue?.id || isFixingAll}
+                />
+              </div>
             </div>
           </div>
 
@@ -429,6 +517,56 @@ export default function DashboardPage() {
           </div>
         </main>
       </div>
+
+      {/* Mobile Bottom Quick Navigation Bar (Sticky on Mobile screens < lg) */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0d151e]/95 backdrop-blur-lg border-t border-[#1e293b] px-3 py-2 flex items-center justify-around shadow-2xl select-none">
+        <button
+          onClick={() => {
+            const el = document.getElementById("scanner");
+            el?.scrollIntoView({ behavior: "smooth" });
+          }}
+          className="flex flex-col items-center gap-0.5 text-[10px] text-[#94a3b8] hover:text-white transition-colors"
+        >
+          <Scan className="w-4 h-4 text-emerald-400" />
+          <span>Scan</span>
+        </button>
+        <button
+          onClick={() => {
+            setMobileActiveView("issues");
+            const el = document.getElementById("issues-section");
+            el?.scrollIntoView({ behavior: "smooth" });
+          }}
+          className="flex flex-col items-center gap-0.5 text-[10px] text-[#94a3b8] hover:text-white transition-colors"
+        >
+          <AlertCircle className="w-4 h-4 text-red-400" />
+          <span>Issues ({issues.length})</span>
+        </button>
+        <button
+          onClick={() => {
+            setMobileActiveView("visualizer");
+            const el = document.getElementById("issues-section");
+            el?.scrollIntoView({ behavior: "smooth" });
+          }}
+          className="flex flex-col items-center gap-0.5 text-[10px] text-[#94a3b8] hover:text-white transition-colors"
+        >
+          <Eye className="w-4 h-4 text-blue-400" />
+          <span>Visualizer</span>
+        </button>
+        <button
+          onClick={handleOpenDemoModal}
+          className="flex flex-col items-center gap-0.5 text-[10px] text-[#94a3b8] hover:text-white transition-colors"
+        >
+          <Globe className="w-4 h-4 text-purple-400" />
+          <span>Demos</span>
+        </button>
+        <button
+          onClick={handleViewReport}
+          className="flex flex-col items-center gap-0.5 text-[10px] text-[#94a3b8] hover:text-white transition-colors"
+        >
+          <FileText className="w-4 h-4 text-emerald-400" />
+          <span>Report</span>
+        </button>
+      </nav>
 
       {/* Demo Selector Modal */}
       <DemoSelectorModal

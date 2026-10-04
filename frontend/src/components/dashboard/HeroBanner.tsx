@@ -52,7 +52,7 @@ export function HeroBanner({
 
         {/* Headline & Subtitle */}
         <div className="mb-6">
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-white mb-3 leading-tight">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white mb-3 leading-tight">
             Detect. <span className="text-emerald-400">Fix.</span> Verify.
           </h1>
           <p className="text-[#94a3b8] text-sm md:text-base max-w-xl leading-relaxed">
