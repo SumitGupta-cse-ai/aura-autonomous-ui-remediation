@@ -22,6 +22,15 @@ interface BeforeAfterComparisonProps {
   onViewReport?: () => void;
   scanId?: string;
   targetUrl?: string;
+  isFixing?: boolean;
+}
+
+function getSafeImageSrc(src?: string): string {
+  if (!src) return "";
+  if (src.startsWith("data:") || src.startsWith("http://") || src.startsWith("https://")) {
+    return src;
+  }
+  return `data:image/png;base64,${src}`;
 }
 
 export function BeforeAfterComparison({
@@ -30,6 +39,7 @@ export function BeforeAfterComparison({
   onViewReport,
   scanId,
   targetUrl,
+  isFixing,
 }: BeforeAfterComparisonProps) {
   const [viewMode, setViewMode] = useState<"screenshot" | "diff">("screenshot");
   const [copied, setCopied] = useState(false);
@@ -118,8 +128,43 @@ export function BeforeAfterComparison({
 
       {/* Main Comparison Area */}
       <div className="p-4 flex-1 overflow-y-auto space-y-4">
+        {/* Live Remediation Indicator */}
+        {isFixing ? (
+          <div className="bg-blue-500/15 border border-blue-500/40 rounded-xl p-3 flex items-center gap-3 animate-pulse">
+            <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+            <div className="min-w-0 flex-1">
+              <span className="text-xs font-bold text-blue-400 block">
+                Remediating Issue Live...
+              </span>
+              <span className="text-[11px] text-[#94a3b8] font-mono truncate block">
+                Applying patch & running axe-core re-audit on <strong className="text-white">{selectedIssue.rule_id}</strong>
+              </span>
+            </div>
+          </div>
+        ) : selectedIssue.status === "fixed" ? (
+          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-2.5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <span className="text-xs font-bold text-emerald-400">
+                Fix Verified & Patched in Sandbox
+              </span>
+            </div>
+            {scanId && (
+              <a
+                href={getSandboxUrl(scanId)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1"
+              >
+                <span>Inspect Live Sandbox</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
+          </div>
+        ) : null}
+
         {viewMode === "screenshot" ? (
-          /* Side-by-side or stacked Screenshots */
+          /* Side-by-side Screenshots */
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Before (Issue) */}
             <div className="bg-[#0b1117] border border-red-500/30 rounded-xl p-3 flex flex-col gap-2">
@@ -132,12 +177,12 @@ export function BeforeAfterComparison({
                   1 Violation
                 </span>
               </div>
-              <div className="w-full h-36 bg-[#16202c] rounded-lg border border-[#1e293b] flex items-center justify-center relative overflow-hidden group">
+              <div className="w-full h-44 sm:h-52 bg-[#16202c] rounded-lg border border-[#1e293b] flex items-center justify-center relative overflow-hidden group">
                 {selectedIssue.before_screenshot ? (
                   <img
-                    src={selectedIssue.before_screenshot}
+                    src={getSafeImageSrc(selectedIssue.before_screenshot)}
                     alt="Before scan"
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-200"
                   />
                 ) : (
                   <div className="text-center p-3">
@@ -164,24 +209,31 @@ export function BeforeAfterComparison({
                   0 Violations
                 </span>
               </div>
-              <div className="w-full h-36 bg-[#16202c] rounded-lg border border-[#1e293b] flex items-center justify-center relative overflow-hidden group">
+              <div className="w-full h-44 sm:h-52 bg-[#16202c] rounded-lg border border-[#1e293b] flex items-center justify-center relative overflow-hidden group">
                 {selectedIssue.after_screenshot ? (
                   <img
-                    src={selectedIssue.after_screenshot}
+                    src={getSafeImageSrc(selectedIssue.after_screenshot)}
                     alt="After scan"
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-200"
+                  />
+                ) : selectedIssue.status === "fixed" && scanId ? (
+                  <iframe
+                    src={getSandboxUrl(scanId)}
+                    title="Patched Sandbox Preview"
+                    className="w-full h-full border-0 transform scale-75 origin-top-left"
+                    style={{ width: "133.33%", height: "133.33%" }}
                   />
                 ) : (
                   <div className="text-center p-3">
-                    <span className="text-xs text-emerald-400 font-mono font-semibold block mb-1">
-                      Patch Verified ✓
+                    <span className={`text-xs font-mono font-semibold block mb-1 ${isFixing ? "text-blue-400 animate-pulse" : "text-[#64748b]"}`}>
+                      {isFixing ? "Remediating in Sandbox..." : "Awaiting Fix"}
                     </span>
                     <span className="text-[10px] text-[#64748b]">
-                      Target resolved in sandbox preview
+                      {isFixing ? "Applying mutation & re-auditing" : "Click Auto-Fix to generate patched sandbox preview"}
                     </span>
                   </div>
                 )}
-                <div className="absolute inset-0 border-2 border-emerald-500/40 rounded-lg pointer-events-none" />
+                <div className={`absolute inset-0 border-2 rounded-lg pointer-events-none ${selectedIssue.status === "fixed" ? "border-emerald-500/40" : "border-[#1e293b]"}`} />
               </div>
             </div>
           </div>

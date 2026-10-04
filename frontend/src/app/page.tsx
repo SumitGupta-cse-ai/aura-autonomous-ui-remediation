@@ -184,17 +184,34 @@ export default function DashboardPage() {
     }
   }
 
-  // Handle Auto-Fix All Issues in Scan
+  // Handle Auto-Fix All Issues in Scan (Step-by-step with real-time UI updates)
   async function handleFixAll() {
     if (!currentScanId) return;
     setIsFixingAll(true);
     try {
-      await fixAllIssues(currentScanId);
-      await fetchScan(currentScanId);
+      const currentIssues = scanData?.issues || [];
+      const nonFixed = currentIssues.filter((i) => i.status !== "fixed");
+
+      for (const issue of nonFixed) {
+        setSelectedIssue(issue);
+        setFixingIssueId(issue.id);
+        try {
+          await fixIssue(currentScanId, issue.id);
+          await fetchScan(currentScanId);
+        } catch (e) {
+          console.error(`Fix failed for ${issue.id}:`, e);
+        }
+        // Brief visual pause so the user sees each fix verify live
+        await new Promise((r) => setTimeout(r, 600));
+      }
     } catch (err) {
       console.error("Auto-Fix All failed:", err);
     } finally {
+      setFixingIssueId(null);
       setIsFixingAll(false);
+      if (currentScanId) {
+        await fetchScan(currentScanId);
+      }
     }
   }
 
@@ -342,6 +359,7 @@ export default function DashboardPage() {
                 onViewReport={handleViewReport}
                 scanId={currentScanId || undefined}
                 targetUrl={scanData?.url}
+                isFixing={fixingIssueId === selectedIssue?.id || isFixingAll}
               />
             </div>
           </div>
