@@ -21,7 +21,7 @@ export function AgentTimeline({ timeline, status }: AgentTimelineProps) {
   }, [timeline]);
 
   return (
-    <div className="bg-[#0f1720] border border-[#1e293b] rounded-xl p-4 overflow-hidden shadow-xl">
+    <div id="agent-timeline" className="bg-[#0f1720] border border-[#1e293b] rounded-xl p-4 overflow-hidden shadow-xl">
       <div className="flex items-center justify-between mb-3 pb-2 border-b border-[#1e293b]">
         <div className="flex items-center gap-2">
           <Activity className="w-4 h-4 text-emerald-400" />

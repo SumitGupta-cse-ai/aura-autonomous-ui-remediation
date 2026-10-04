@@ -17,6 +17,7 @@ interface HeroBannerProps {
   setUrl: (url: string) => void;
   onScan: (e: React.FormEvent) => void;
   onDemo: () => void;
+  onViewReport?: () => void;
   loading: boolean;
   demoLoading: boolean;
   error?: string;
@@ -27,6 +28,7 @@ export function HeroBanner({
   setUrl,
   onScan,
   onDemo,
+  onViewReport,
   loading,
   demoLoading,
   error,
@@ -108,13 +110,14 @@ export function HeroBanner({
             <span>Try Demo Website</span>
           </button>
 
-          <a
-            href="#report-section"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#16202c] hover:bg-[#1e2d3d] border border-[#1e293b] text-[#94a3b8] hover:text-white text-xs font-medium rounded-lg transition-all"
+          <button
+            type="button"
+            onClick={onViewReport}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#16202c] hover:bg-[#1e2d3d] border border-[#1e293b] text-[#94a3b8] hover:text-white text-xs font-medium rounded-lg transition-all cursor-pointer"
           >
             <FileText className="w-3.5 h-3.5" />
             <span>View Sample Report</span>
-          </a>
+          </button>
         </div>
 
         {error && (
@@ -126,7 +129,7 @@ export function HeroBanner({
       </div>
 
       {/* Right Column: How AURA Works Card */}
-      <div className="lg:col-span-4 bg-[#0f1720] border border-[#1e293b] rounded-2xl p-6 flex flex-col justify-between shadow-xl">
+      <div id="how-it-works" className="lg:col-span-4 bg-[#0f1720] border border-[#1e293b] rounded-2xl p-6 flex flex-col justify-between shadow-xl">
         <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-emerald-400" />
           How AURA Works

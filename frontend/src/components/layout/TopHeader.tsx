@@ -19,12 +19,16 @@ import { useTheme } from "../theme/ThemeProvider";
 interface TopHeaderProps {
   currentUrl?: string;
   onDemoClick?: () => void;
+  onReportClick?: () => void;
+  onDocsClick?: () => void;
   onToggleMobileMenu?: () => void;
 }
 
 export function TopHeader({
   currentUrl,
   onDemoClick,
+  onReportClick,
+  onDocsClick,
   onToggleMobileMenu,
 }: TopHeaderProps) {
   const { theme, toggleTheme } = useTheme();
@@ -36,7 +40,7 @@ export function TopHeader({
         {/* Mobile Hamburger Button */}
         <button
           onClick={onToggleMobileMenu}
-          className="lg:hidden p-2 rounded-lg bg-[#16202c] border border-[#1e293b] text-[#94a3b8] hover:text-white transition-colors flex-shrink-0"
+          className="lg:hidden p-2 rounded-lg bg-[#16202c] border border-[#1e293b] text-[#94a3b8] hover:text-white transition-colors flex-shrink-0 cursor-pointer"
           aria-label="Open Navigation Menu"
         >
           <Menu className="w-5 h-5 text-emerald-400" />
@@ -73,19 +77,26 @@ export function TopHeader({
             <Wrench className="w-3.5 h-3.5" />
             <span>Fixes</span>
           </a>
-          <a
-            href="#report-section"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#16202c] border border-[#1e293b] text-[#94a3b8] hover:text-white hover:border-[#334155] text-xs font-medium transition-all flex-shrink-0"
+          <button
+            onClick={onReportClick}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#16202c] border border-[#1e293b] text-[#94a3b8] hover:text-white hover:border-[#334155] text-xs font-medium transition-all flex-shrink-0 cursor-pointer"
           >
             <FileText className="w-3.5 h-3.5" />
             <span>Reports</span>
-          </a>
+          </button>
           <button
             onClick={onDemoClick}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#16202c] border border-[#1e293b] text-[#94a3b8] hover:text-white hover:border-[#334155] text-xs font-medium transition-all flex-shrink-0"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#16202c] border border-[#1e293b] text-[#94a3b8] hover:text-white hover:border-[#334155] text-xs font-medium transition-all flex-shrink-0 cursor-pointer"
           >
             <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
             <span>Demo</span>
+          </button>
+          <button
+            onClick={onDocsClick}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#16202c] border border-[#1e293b] text-[#94a3b8] hover:text-white hover:border-[#334155] text-xs font-medium transition-all flex-shrink-0 cursor-pointer"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-blue-400" />
+            <span>Docs</span>
           </button>
         </div>
       </div>

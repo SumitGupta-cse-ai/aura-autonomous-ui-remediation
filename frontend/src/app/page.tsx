@@ -11,6 +11,7 @@ import { IssueDetailPanel } from "@/components/dashboard/IssueDetailPanel";
 import { BeforeAfterComparison } from "@/components/dashboard/BeforeAfterComparison";
 import { ReportModal } from "@/components/dashboard/ReportModal";
 import { DemoSelectorModal, DemoSiteOption } from "@/components/dashboard/DemoSelectorModal";
+import { DocumentationModal } from "@/components/dashboard/DocumentationModal";
 
 import {
   startScan,
@@ -45,6 +46,7 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
   const [reportData, setReportData] = useState<ScanReport | null>(null);
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isDocsOpen, setIsDocsOpen] = useState(false);
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
   const [demoOptions, setDemoOptions] = useState<DemoSiteOption[]>([]);
   const [loadingDemoId, setLoadingDemoId] = useState<string | null>(null);
@@ -293,6 +295,18 @@ export default function DashboardPage() {
           handleOpenDemoModal();
           setMobileSidebarOpen(false);
         }}
+        onReportClick={() => {
+          handleViewReport();
+          setMobileSidebarOpen(false);
+        }}
+        onDocsClick={() => {
+          setIsDocsOpen(true);
+          setMobileSidebarOpen(false);
+        }}
+        onHowItWorksClick={() => {
+          document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" });
+          setMobileSidebarOpen(false);
+        }}
         mobileOpen={mobileSidebarOpen}
         onClose={() => setMobileSidebarOpen(false)}
       />
@@ -303,6 +317,8 @@ export default function DashboardPage() {
         <TopHeader
           currentUrl={scanData?.url}
           onDemoClick={handleOpenDemoModal}
+          onReportClick={handleViewReport}
+          onDocsClick={() => setIsDocsOpen(true)}
           onToggleMobileMenu={() => setMobileSidebarOpen((prev) => !prev)}
         />
 
@@ -315,6 +331,7 @@ export default function DashboardPage() {
               setUrl={setUrl}
               onScan={handleScanSubmit}
               onDemo={handleOpenDemoModal}
+              onViewReport={handleViewReport}
               loading={scanLoading}
               demoLoading={demoLoading}
               error={error}
@@ -325,6 +342,8 @@ export default function DashboardPage() {
           <SummaryMetrics
             summary={scanData?.summary}
             scanStatus={scanData?.status || "ready"}
+            onSelectFilter={(newFilter) => setFilter(newFilter)}
+            onOpenDocs={() => setIsDocsOpen(true)}
           />
 
           {/* Section 3: Real-Time Agent Execution Timeline */}
@@ -582,6 +601,16 @@ export default function DashboardPage() {
         report={reportData}
         isOpen={isReportOpen}
         onClose={() => setIsReportOpen(false)}
+      />
+
+      {/* Documentation Modal */}
+      <DocumentationModal
+        isOpen={isDocsOpen}
+        onClose={() => setIsDocsOpen(false)}
+        onOpenDemo={() => {
+          setIsDocsOpen(false);
+          handleOpenDemoModal();
+        }}
       />
     </div>
   );

@@ -24,6 +24,9 @@ interface SidebarProps {
   fixedCount?: number;
   onNewScanClick?: () => void;
   onDemoClick?: () => void;
+  onReportClick?: () => void;
+  onDocsClick?: () => void;
+  onHowItWorksClick?: () => void;
   mobileOpen?: boolean;
   onClose?: () => void;
 }
@@ -33,6 +36,9 @@ export function Sidebar({
   fixedCount = 0,
   onNewScanClick,
   onDemoClick,
+  onReportClick,
+  onDocsClick,
+  onHowItWorksClick,
   mobileOpen = false,
   onClose,
 }: SidebarProps) {
@@ -68,7 +74,8 @@ export function Sidebar({
     {
       label: "Reports",
       icon: FileText,
-      href: "#report-section",
+      action: onReportClick,
+      active: false,
     },
     {
       label: "History",
@@ -77,11 +84,26 @@ export function Sidebar({
     },
   ];
 
-  const quickLinks = [
+  const quickLinks: {
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    onClick?: () => void;
+    href?: string;
+  }[] = [
     { label: "Demo Website", icon: ExternalLink, onClick: onDemoClick },
-    { label: "Sample Reports", icon: FileText, href: "#report-section" },
-    { label: "How It Works", icon: HelpCircle, href: "#how-it-works" },
-    { label: "Documentation", icon: BookOpen, href: "#docs" },
+    { label: "Sample Reports", icon: FileText, onClick: onReportClick },
+    {
+      label: "How It Works",
+      icon: HelpCircle,
+      onClick: () => {
+        if (onHowItWorksClick) {
+          onHowItWorksClick();
+        } else {
+          document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" });
+        }
+      },
+    },
+    { label: "Documentation", icon: BookOpen, onClick: onDocsClick },
   ];
 
   const sidebarContent = (

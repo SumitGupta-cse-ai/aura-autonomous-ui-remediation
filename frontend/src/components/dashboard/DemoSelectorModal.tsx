@@ -147,7 +147,11 @@ export function DemoSelectorModal({
 
                   <button
                     disabled={isLoading}
-                    className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs transition-all flex items-center gap-1 group-hover:aura-glow-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectDemo(demo.url);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold text-xs transition-all flex items-center gap-1 group-hover:aura-glow-sm cursor-pointer"
                   >
                     {isLoading ? (
                       <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
