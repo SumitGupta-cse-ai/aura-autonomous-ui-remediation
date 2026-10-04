@@ -223,9 +223,9 @@ Vision Result: {json.dumps(vision_result or {}, default=str)[:200]}
         if rule_id == "heading-order":
             return FixPlan(
                 issue_id=issue_id,
-                strategy="set_text_content",
+                strategy="modify_tag",
                 target={"selector": selector},
-                changes=[FixChange(type="modify_tag", tag="h2", text="Harvest Highlights")],
+                changes=[FixChange(type="modify_tag", tag="h2")],
                 reason="Adjusted heading level to h2 to preserve sequential heading hierarchy.",
                 verification_rule="heading-order",
             )

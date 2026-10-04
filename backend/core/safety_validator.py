@@ -18,7 +18,7 @@ ALLOWED_ATTRIBUTES = {
 ALLOWED_STRATEGIES = {
     "add_attribute", "modify_attribute", "remove_attribute",
     "add_element", "modify_element", "add_style", "modify_style",
-    "wrap_element", "set_text_content",
+    "wrap_element", "set_text_content", "modify_tag",
 }
 
 # Allowed CSS properties

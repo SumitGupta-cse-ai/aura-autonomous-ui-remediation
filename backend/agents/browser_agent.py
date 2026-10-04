@@ -20,6 +20,8 @@ except ImportError:
     BrowserContext = Any
 
 AXE_CORE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.9.1/axe.min.js"
+AXE_LOCAL_FILE = Path(__file__).resolve().parent.parent / "static" / "axe.min.js"
+AXE_CORE_LOCAL_SCRIPT = AXE_LOCAL_FILE.read_text(encoding="utf-8") if AXE_LOCAL_FILE.exists() else ""
 
 SEVERITY_MAP = {
     "critical": "critical",
@@ -204,18 +206,21 @@ class BrowserAgent:
             return self._run_static_audit(target_html)
 
         try:
-            await page.evaluate(f"""
-                () => {{
-                    return new Promise((resolve, reject) => {{
-                        if (window.axe) {{ resolve(); return; }}
-                        const script = document.createElement('script');
-                        script.src = '{AXE_CORE_CDN}';
-                        script.onload = resolve;
-                        script.onerror = () => reject(new Error('Failed to load axe-core'));
-                        document.head.appendChild(script);
-                    }});
-                }}
-            """)
+            if AXE_CORE_LOCAL_SCRIPT:
+                await page.evaluate(AXE_CORE_LOCAL_SCRIPT)
+            else:
+                await page.evaluate(f"""
+                    () => {{
+                        return new Promise((resolve, reject) => {{
+                            if (window.axe) {{ resolve(); return; }}
+                            const script = document.createElement('script');
+                            script.src = '{AXE_CORE_CDN}';
+                            script.onload = resolve;
+                            script.onerror = () => reject(new Error('Failed to load axe-core'));
+                            document.head.appendChild(script);
+                        }});
+                    }}
+                """)
 
             await page.wait_for_function("typeof window.axe !== 'undefined'", timeout=10000)
 
@@ -707,11 +712,12 @@ class BrowserAgent:
                     )
 
             # Rule 6: heading-order
-            elif rule == "heading-order" or re.search(r'\bh[1-6]\b', selector):
-                patched_html = re.sub(r'<h[456]\b', '<h2', patched_html, count=1, flags=re.IGNORECASE)
-                patched_html = re.sub(r'</h[456]>', '</h2>', patched_html, count=1, flags=re.IGNORECASE)
-                patched_html = re.sub(r'<h[456]\b', '<h3', patched_html, flags=re.IGNORECASE)
-                patched_html = re.sub(r'</h[456]>', '</h3>', patched_html, flags=re.IGNORECASE)
+            elif rule == "heading-order" or re.search(r'\bh[1-6]\b', selector) or getattr(change, "tag", None):
+                target_tag = getattr(change, "tag", "") or "h2"
+                patched_html = re.sub(r'<h[3456]\b([^>]*)>', rf'<{target_tag}\1>', patched_html, count=1, flags=re.IGNORECASE)
+                patched_html = re.sub(r'</h[3456]>', rf'</{target_tag}>', patched_html, count=1, flags=re.IGNORECASE)
+                patched_html = re.sub(r'<h[456]\b([^>]*)>', r'<h3\1>', patched_html, flags=re.IGNORECASE)
+                patched_html = re.sub(r'</h[456]>', r'</h3>', patched_html, flags=re.IGNORECASE)
 
         return patched_html
 

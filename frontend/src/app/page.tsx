@@ -39,6 +39,7 @@ export default function DashboardPage() {
   const [selectedIssue, setSelectedIssue] = useState<AccessibilityIssue | null>(null);
   const [filter, setFilter] = useState<FilterType>("all");
   const [fixingIssueId, setFixingIssueId] = useState<string | null>(null);
+  const [isFixingAll, setIsFixingAll] = useState(false);
   const [scanLoading, setScanLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
   const [error, setError] = useState("");
@@ -183,6 +184,20 @@ export default function DashboardPage() {
     }
   }
 
+  // Handle Auto-Fix All Issues in Scan
+  async function handleFixAll() {
+    if (!currentScanId) return;
+    setIsFixingAll(true);
+    try {
+      await fixAllIssues(currentScanId);
+      await fetchScan(currentScanId);
+    } catch (err) {
+      console.error("Auto-Fix All failed:", err);
+    } finally {
+      setIsFixingAll(false);
+    }
+  }
+
   // Handle View Full Report / Sample Report
   async function handleViewReport() {
     if (currentScanId) {
@@ -304,6 +319,8 @@ export default function DashboardPage() {
                 fixingIssueId={fixingIssueId}
                 filter={filter}
                 setFilter={setFilter}
+                onFixAll={handleFixAll}
+                isFixingAll={isFixingAll}
               />
             </div>
 

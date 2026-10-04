@@ -34,6 +34,8 @@ interface IssueExplorerProps {
   fixingIssueId?: string | null;
   filter: FilterType;
   setFilter: (f: FilterType) => void;
+  onFixAll?: () => void;
+  isFixingAll?: boolean;
 }
 
 export function IssueExplorer({
@@ -44,6 +46,8 @@ export function IssueExplorer({
   fixingIssueId,
   filter,
   setFilter,
+  onFixAll,
+  isFixingAll,
 }: IssueExplorerProps) {
   const filtered = issues.filter((issue) => {
     if (filter === "all") return true;
@@ -74,6 +78,18 @@ export function IssueExplorer({
               Issues ({issues.length})
             </h3>
           </div>
+
+          {onFixAll && issues.some((i) => i.status !== "fixed") && (
+            <button
+              onClick={onFixAll}
+              disabled={isFixingAll}
+              className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold text-xs rounded-lg transition-all flex items-center gap-1.5 shadow-md shadow-emerald-500/20 cursor-pointer"
+              title="Automatically fix all remediable issues in isolated sandbox"
+            >
+              <Sparkles className={`w-3.5 h-3.5 ${isFixingAll ? "animate-spin" : ""}`} />
+              <span>{isFixingAll ? "Auto-Fixing..." : "Auto-Fix All"}</span>
+            </button>
+          )}
         </div>
 
         {/* Filter Pills */}
@@ -178,21 +194,21 @@ export function IssueExplorer({
                     <span>{statusLabel(issue.status)}</span>
                   </span>
 
-                  {issue.status === "unresolved" && (
+                  {issue.status !== "fixed" && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         onFixIssue(issue.id);
                       }}
                       disabled={isFixing}
-                      className="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-xs font-semibold transition-all flex items-center gap-1 disabled:opacity-50"
+                      className="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-xs font-semibold transition-all flex items-center gap-1 disabled:opacity-50 cursor-pointer"
                     >
                       {isFixing ? (
                         <div className="w-3 h-3 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />
                       ) : (
                         <Wrench className="w-3 h-3" />
                       )}
-                      <span>Fix</span>
+                      <span>{issue.status === "failed" ? "Retry" : "Fix"}</span>
                     </button>
                   )}
 

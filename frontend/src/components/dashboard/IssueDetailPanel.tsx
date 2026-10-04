@@ -342,12 +342,12 @@ export function IssueDetailPanel({
       </div>
 
       {/* Footer Action */}
-      {issue.status === "unresolved" && (
+      {issue.status !== "fixed" && (
         <div className="p-4 border-t border-[#1e293b] bg-[#0d151e]">
           <button
             onClick={() => onFix(issue.id)}
             disabled={isFixing}
-            className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold text-xs rounded-xl transition-all flex items-center justify-center gap-2 aura-glow-sm shadow-lg"
+            className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold text-xs rounded-xl transition-all flex items-center justify-center gap-2 aura-glow-sm shadow-lg cursor-pointer"
           >
             {isFixing ? (
               <>
@@ -357,7 +357,7 @@ export function IssueDetailPanel({
             ) : (
               <>
                 <Wrench className="w-3.5 h-3.5" />
-                <span>Auto Fix This Issue</span>
+                <span>{issue.status === "failed" ? "Retry Fix For This Issue" : "Auto Fix This Issue"}</span>
               </>
             )}
           </button>

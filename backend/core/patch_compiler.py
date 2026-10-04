@@ -120,4 +120,19 @@ def _compile_change(change, strategy: str):
             rollback.append(f"else el.setAttribute({safe_attr}, origVal);")
             patch.append(f"el.setAttribute({safe_attr}, {safe_value});")
 
+    elif strategy == "modify_tag" or change.tag:
+        tag = change.tag or "h2"
+        safe_tag = json.dumps(tag)
+        patch.append(f"const newEl = document.createElement({safe_tag});")
+        patch.append(f"newEl.innerHTML = el.innerHTML;")
+        patch.append(f"for (let i = 0; i < el.attributes.length; i++) {{ newEl.setAttribute(el.attributes[i].name, el.attributes[i].value); }}")
+        patch.append(f"newEl.dataset.auraOrigTag = el.tagName.toLowerCase();")
+        patch.append(f"el.parentNode.replaceChild(newEl, el);")
+
+        rollback.append(f"const origTag = el.dataset?.auraOrigTag || 'h6';")
+        rollback.append(f"const origEl = document.createElement(origTag);")
+        rollback.append(f"origEl.innerHTML = el.innerHTML;")
+        rollback.append(f"for (let i = 0; i < el.attributes.length; i++) {{ origEl.setAttribute(el.attributes[i].name, el.attributes[i].value); }}")
+        rollback.append(f"el.parentNode.replaceChild(origEl, el);")
+
     return patch, rollback

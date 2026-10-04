@@ -152,10 +152,10 @@ Accessibility Violation Evidence:
             "heading-order": IssueAnalysis(
                 root_cause="Heading hierarchy is not sequential (e.g., h1 followed by h3, skipping h2).",
                 user_impact="Screen reader users rely on heading hierarchy for document navigation.",
-                is_auto_remediable=False,
+                is_auto_remediable=True,
                 recommended_strategy="Review heading structure and adjust to proper sequential order.",
                 verification_approach="Re-run heading-order rule.",
-                confidence=0.6,
+                confidence=0.85,
             ),
         }
 
