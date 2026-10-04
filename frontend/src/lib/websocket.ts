@@ -17,7 +17,7 @@ export function resolveWsBase(): string {
     return base.replace('http://', 'ws://');
   }
 
-  return 'ws://localhost:8000';
+  return 'wss://aura-autonomous-ui-remediation.onrender.com';
 }
 
 export function connectScanWebSocket(

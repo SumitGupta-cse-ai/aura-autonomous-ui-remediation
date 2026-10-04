@@ -155,10 +155,14 @@ export default function DashboardPage() {
     setScanLoading(true);
 
     let targetUrl = url.trim();
-    // Auto-normalize any demo-site URL to the active backend so it works everywhere
+    const base = getApiBase();
+    // Auto-normalize any demo-site or localhost URL to the active backend so it works everywhere
     if (targetUrl.includes("/demo-site/")) {
       const demoPath = targetUrl.substring(targetUrl.indexOf("/demo-site/"));
-      targetUrl = `${getApiBase()}${demoPath}`;
+      targetUrl = `${base}${demoPath}`;
+      setUrl(targetUrl);
+    } else if (targetUrl.match(/^https?:\/\/(localhost|127\.0\.0\.1):8000/i)) {
+      targetUrl = targetUrl.replace(/^https?:\/\/(localhost|127\.0\.0\.1):8000/i, base);
       setUrl(targetUrl);
     }
 
@@ -186,9 +190,12 @@ export default function DashboardPage() {
     setError("");
 
     let targetUrl = demoUrl;
+    const base = getApiBase();
     if (targetUrl.includes("/demo-site/")) {
       const demoPath = targetUrl.substring(targetUrl.indexOf("/demo-site/"));
-      targetUrl = `${getApiBase()}${demoPath}`;
+      targetUrl = `${base}${demoPath}`;
+    } else if (targetUrl.match(/^https?:\/\/(localhost|127\.0\.0\.1):8000/i)) {
+      targetUrl = targetUrl.replace(/^https?:\/\/(localhost|127\.0\.0\.1):8000/i, base);
     }
 
     try {

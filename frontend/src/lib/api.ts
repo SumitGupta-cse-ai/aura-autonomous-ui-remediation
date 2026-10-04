@@ -11,31 +11,27 @@ import type { DemoSiteOption } from '@/components/dashboard/DemoSelectorModal';
 export const PRODUCTION_API_URL = 'https://aura-autonomous-ui-remediation.onrender.com';
 
 export function getApiBase(): string {
-  // 1. In browser runtime: Check hostname
+  // 1. Explicit local backend request via query param or localStorage
   if (typeof window !== 'undefined') {
-    const host = window.location.hostname;
-    // On any production domain (such as Vercel *.vercel.app), use the Render backend
-    if (host !== 'localhost' && host !== '127.0.0.1' && !host.startsWith('192.168.') && !host.startsWith('10.')) {
-      return PRODUCTION_API_URL;
+    if (window.location.search.includes('backend=local') || localStorage.getItem('aura_api_base') === 'local') {
+      return 'http://localhost:8000';
     }
   }
 
   // 2. Check environment variables
   const envUrl = process.env.NEXT_PUBLIC_API_URL || process.env.VITE_API_URL;
-  if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
-    return envUrl.replace(/\/+$/, '');
+  if (envUrl && envUrl.trim() && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
+    return envUrl.trim().replace(/\/+$/, '');
   }
 
-  if (process.env.NODE_ENV === 'production') {
-    return PRODUCTION_API_URL;
-  }
-
-  return envUrl ? envUrl.replace(/\/+$/, '') : 'http://localhost:8000';
+  // 3. UNIVERSAL DEFAULT: Always connect to live Render backend
+  // Ensures zero "Failed to fetch" errors whether running on Vercel, Netlify, or local dev
+  return PRODUCTION_API_URL;
 }
 
-const API_BASE = getApiBase();
+export const API_BASE = PRODUCTION_API_URL;
 
-async function apiFetch<T>(path: string, options?: RequestInit, retries = 2): Promise<T> {
+async function apiFetch<T>(path: string, options?: RequestInit, retries = 3): Promise<T> {
   const base = getApiBase();
   const url = `${base}${path.startsWith('/') ? path : '/' + path}`;
 
@@ -53,10 +49,22 @@ async function apiFetch<T>(path: string, options?: RequestInit, retries = 2): Pr
     } catch (err: unknown) {
       const isNetworkError =
         err instanceof TypeError ||
-        (err instanceof Error && (err.message.includes('fetch') || err.message.includes('network')));
+        (err instanceof Error && (
+          err.message.includes('fetch') ||
+          err.message.includes('network') ||
+          err.message.includes('Failed')
+        ));
+
       if (attempt < retries && isNetworkError) {
-        await new Promise((r) => setTimeout(r, 1200));
+        // Wait with progressive backoff (Render spin-up recovery)
+        await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
         continue;
+      }
+
+      if (isNetworkError) {
+        throw new Error(
+          `Unable to connect to AURA Backend at ${base}. If Render was inactive, it may be waking up — please click "Scan Website" again in a few seconds.`
+        );
       }
       throw err;
     }
@@ -121,5 +129,3 @@ export function getDownloadPatchUrl(scanId: string): string {
 export function getDownloadReportUrl(scanId: string): string {
   return `${getApiBase()}/api/scan/${scanId}/report/download`;
 }
-
-export { API_BASE };
