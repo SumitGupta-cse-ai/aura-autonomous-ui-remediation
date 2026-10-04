@@ -1,0 +1,9 @@
+# The deployable web app is the Next.js project in /frontend.
+# The Python FastAPI backend in /backend is not deployed to Netlify.
+[build]
+  base = "frontend"
+  command = "npm install && npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
