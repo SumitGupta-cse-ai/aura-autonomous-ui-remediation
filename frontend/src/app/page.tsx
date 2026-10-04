@@ -147,17 +147,15 @@ export default function DashboardPage() {
   // Handle URL Form Scan Submit
   async function handleScanSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!url.trim()) {
-      setError("Please enter a valid website URL");
-      return;
-    }
     setError("");
     setScanLoading(true);
 
     let targetUrl = url.trim();
     const base = getApiBase();
-    // Auto-normalize any demo-site or localhost URL to the active backend so it works everywhere
-    if (targetUrl.includes("/demo-site/")) {
+    if (!targetUrl) {
+      targetUrl = `${base}/demo-site/full_remediation.html`;
+      setUrl(targetUrl);
+    } else if (targetUrl.includes("/demo-site/")) {
       const demoPath = targetUrl.substring(targetUrl.indexOf("/demo-site/"));
       targetUrl = `${base}${demoPath}`;
       setUrl(targetUrl);
@@ -413,6 +411,7 @@ export default function DashboardPage() {
               url={url}
               setUrl={setUrl}
               onScan={handleScanSubmit}
+              onQuickScan={handleSelectDemoSite}
               onDemo={handleOpenDemoModal}
               onViewReport={handleViewReport}
               loading={scanLoading}

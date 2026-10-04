@@ -16,6 +16,7 @@ interface HeroBannerProps {
   url: string;
   setUrl: (url: string) => void;
   onScan: (e: React.FormEvent) => void;
+  onQuickScan?: (url: string) => void;
   onDemo: () => void;
   onViewReport?: () => void;
   loading: boolean;
@@ -27,6 +28,7 @@ export function HeroBanner({
   url,
   setUrl,
   onScan,
+  onQuickScan,
   onDemo,
   onViewReport,
   loading,
@@ -63,7 +65,7 @@ export function HeroBanner({
         </div>
 
         {/* URL Scanner Input */}
-        <form onSubmit={onScan} className="w-full mb-4">
+        <form onSubmit={onScan} className="w-full mb-3">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748b]" />
@@ -71,19 +73,19 @@ export function HeroBanner({
                 type="url"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://example.com"
+                placeholder="https://example.com or select a test site below"
                 className="w-full pl-11 pr-4 py-3.5 bg-[#0b1117] border border-[#1e293b] focus:border-emerald-500 rounded-xl text-white placeholder-[#64748b] text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500/30 transition-all font-mono"
               />
             </div>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-3.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold text-sm rounded-xl transition-all flex items-center justify-center gap-2 aura-glow-sm shadow-lg flex-shrink-0"
+              className="px-6 py-3.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold text-sm rounded-xl transition-all flex items-center justify-center gap-2 aura-glow-sm shadow-lg flex-shrink-0 cursor-pointer"
             >
               {loading ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Scanning...
+                  <span>Scanning...</span>
                 </>
               ) : (
                 <>
@@ -94,6 +96,42 @@ export function HeroBanner({
             </button>
           </div>
         </form>
+
+        {/* One-Click Quick Test Websites with Real Accessibility Violations */}
+        <div className="flex items-center gap-2 flex-wrap mb-4">
+          <span className="text-[11px] text-[#64748b] font-medium flex items-center gap-1">
+            <Sparkles className="w-3 h-3 text-emerald-400" />
+            Quick Test Sites:
+          </span>
+          <button
+            type="button"
+            onClick={() => onQuickScan?.("https://aura-autonomous-ui-remediation.onrender.com/demo-site/full_remediation.html")}
+            disabled={loading}
+            className="px-2.5 py-1 rounded-lg bg-[#16202c] hover:bg-emerald-500/20 border border-[#1e293b] hover:border-emerald-500/40 text-[11px] font-semibold text-emerald-400 transition-all flex items-center gap-1 cursor-pointer"
+            title="Featured Judge Demo with 7+ accessibility violations"
+          >
+            <span>ShopX Demo (7+ Issues)</span>
+            <span className="text-[9px] px-1 rounded bg-emerald-500/20 text-emerald-300 font-mono font-bold">Featured</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onQuickScan?.("https://aura-autonomous-ui-remediation.onrender.com/demo-site/demo1.html")}
+            disabled={loading}
+            className="px-2.5 py-1 rounded-lg bg-[#16202c] hover:bg-blue-500/20 border border-[#1e293b] hover:border-blue-500/40 text-[11px] font-medium text-[#94a3b8] hover:text-white transition-all cursor-pointer"
+          >
+            <span>WCAG Basics (5 Issues)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onQuickScan?.("https://www.w3.org/WAI/demos/bad/")}
+            disabled={loading}
+            className="px-2.5 py-1 rounded-lg bg-[#16202c] hover:bg-amber-500/20 border border-[#1e293b] hover:border-amber-500/40 text-[11px] font-medium text-amber-300 hover:text-white transition-all flex items-center gap-1 cursor-pointer"
+            title="Official W3C Before/After Inaccessible Web Page Demo"
+          >
+            <Globe className="w-3 h-3 text-amber-400" />
+            <span>W3C Inaccessible Demo</span>
+          </button>
+        </div>
 
         {/* Secondary Action Buttons & Error */}
         <div className="flex items-center gap-3 flex-wrap">
