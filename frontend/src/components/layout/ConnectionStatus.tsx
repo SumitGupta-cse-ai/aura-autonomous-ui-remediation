@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Activity, Server, Cpu, Database, ChevronDown } from "lucide-react";
+import { API_BASE } from "@/lib/api";
 
 interface ConnectionStatusProps {
   apiBaseUrl?: string;
@@ -9,7 +10,8 @@ interface ConnectionStatusProps {
 
 export type ConnectionState = "online" | "checking" | "offline";
 
-export function ConnectionStatus({ apiBaseUrl = "http://localhost:8000" }: ConnectionStatusProps) {
+export function ConnectionStatus({ apiBaseUrl }: ConnectionStatusProps) {
+  const effectiveBaseUrl = (apiBaseUrl || API_BASE).replace(/\/+$/, "");
   const [status, setStatus] = useState<ConnectionState>("online");
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [healthData, setHealthData] = useState<{
@@ -47,7 +49,7 @@ export function ConnectionStatus({ apiBaseUrl = "http://localhost:8000" }: Conne
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-        const res = await fetch(`${apiBaseUrl}/api/health`, {
+        const res = await fetch(`${effectiveBaseUrl}/api/health`, {
           signal: controller.signal,
         });
         clearTimeout(timeoutId);
@@ -94,7 +96,7 @@ export function ConnectionStatus({ apiBaseUrl = "http://localhost:8000" }: Conne
       isMounted = false;
       clearInterval(interval);
     };
-  }, [apiBaseUrl]);
+  }, [effectiveBaseUrl]);
 
   return (
     <div className="relative" ref={popoverRef}>
@@ -127,7 +129,7 @@ export function ConnectionStatus({ apiBaseUrl = "http://localhost:8000" }: Conne
 
         <span className="font-mono text-[11px] font-medium text-white dark:text-white">
           {status === "online"
-            ? "Local / Ready"
+            ? "API / Online"
             : status === "checking"
             ? "Reconnecting..."
             : "Offline"}

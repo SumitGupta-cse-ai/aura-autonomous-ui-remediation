@@ -11,6 +11,7 @@ import {
   Sparkles,
   CheckCircle2,
 } from "lucide-react";
+import { API_BASE } from "@/lib/api";
 
 export interface DemoSiteOption {
   id: string;
@@ -41,10 +42,19 @@ export function DemoSelectorModal({
 
   const defaultDemos: DemoSiteOption[] = [
     {
+      id: "full_remediation",
+      name: "ShopX Full Remediation Demo",
+      description: "Featured Judge Demo: Realistic ShopX e-commerce website with 7+ accessibility violations (missing lang, low contrast, unlabelled inputs, unlabelled icon buttons, missing image alt, heading hierarchy skip).",
+      url: `${API_BASE}/demo-site/full_remediation.html`,
+      expected_issues: "7+ findings",
+      difficulty: "Judge Demo",
+      demonstrates: "Full closed-loop agent: Observe -> Reason -> Patch -> Sandbox -> Re-audit -> Verify",
+    },
+    {
       id: "demo1",
       name: "1. Accessibility Basics",
       description: "Standard WCAG accessibility violations (missing alt, no form labels, icon button missing name, heading order skip, low contrast).",
-      url: "http://localhost:8000/demo-site/demo1.html",
+      url: `${API_BASE}/demo-site/demo1.html`,
       expected_issues: "5-7 findings",
       difficulty: "Essential",
       demonstrates: "axe-core audit, DOM context analysis, alt-text patching, label association",
@@ -53,7 +63,7 @@ export function DemoSelectorModal({
       id: "demo2",
       name: "2. E-Commerce Shop",
       description: "Realistic shopping page with product cards, category filters, search bar, and cart actions.",
-      url: "http://localhost:8000/demo-site/demo2.html",
+      url: `${API_BASE}/demo-site/demo2.html`,
       expected_issues: "6-8 findings",
       difficulty: "Intermediate",
       demonstrates: "Product image vision analysis, search label remediation, cart icon name generation",
@@ -62,7 +72,7 @@ export function DemoSelectorModal({
       id: "demo3",
       name: "3. SaaS Dashboard",
       description: "Cloud infrastructure analytics dashboard with sidebar navigation, metric cards, and data table.",
-      url: "http://localhost:8000/demo-site/demo3.html",
+      url: `${API_BASE}/demo-site/demo3.html`,
       expected_issues: "5-7 findings",
       difficulty: "Advanced",
       demonstrates: "Table button ARIA labeling, dark theme contrast audit, avatar alt text fix",

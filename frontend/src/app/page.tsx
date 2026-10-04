@@ -21,6 +21,8 @@ import {
   fixAllIssues,
   getScanReport,
   getDemoSiteUrl,
+  getDemoSites,
+  API_BASE,
 } from "@/lib/api";
 import { connectScanWebSocket } from "@/lib/websocket";
 import type {
@@ -66,8 +68,7 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/demo-sites")
-      .then((res) => res.json())
+    getDemoSites()
       .then((data) => setDemoOptions(data))
       .catch(() => {});
     fetchScansHistory();
@@ -235,7 +236,7 @@ export default function DashboardPage() {
     // Sample Report Fallback for instant Judge evaluation
     setReportData({
       scan_id: "sample-demo-report",
-      url: "http://localhost:8000/demo-site/demo1.html",
+      url: `${API_BASE}/demo-site/demo1.html`,
       scan_timestamp: new Date().toISOString(),
       total_issues: 6,
       issues_by_severity: { critical: 2, serious: 2, moderate: 1, minor: 1 },

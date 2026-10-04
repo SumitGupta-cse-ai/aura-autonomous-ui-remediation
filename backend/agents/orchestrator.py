@@ -356,9 +356,11 @@ class Orchestrator:
 
         if verification.status == VerificationStatus.VERIFIED:
             issue.status = IssueStatus.FIXED
-            port = os.getenv("PORT", "8000")
+            render_url = os.getenv("RENDER_EXTERNAL_URL")
+            app_url = os.getenv("APP_URL") or os.getenv("BACKEND_URL")
+            base_url = render_url.rstrip("/") if render_url else app_url.rstrip("/") if app_url else f"http://localhost:{os.getenv('PORT', '8000')}"
             scan = self._scans[scan_id]
-            scan.sandbox_url = f"http://localhost:{port}/sandbox/{scan_id}"
+            scan.sandbox_url = f"{base_url}/sandbox/{scan_id}"
             await self._emit_event(scan_id, TimelineEventType.SUCCESS,
                                    f"Fix VERIFIED ✓ — {issue.rule_id}",
                                    verification.details)

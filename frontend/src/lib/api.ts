@@ -6,8 +6,31 @@ import type {
   FixResult,
   ScanReport,
 } from './types';
+import type { DemoSiteOption } from '@/components/dashboard/DemoSelectorModal';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+export const PRODUCTION_API_URL = 'https://aura-autonomous-ui-remediation.onrender.com';
+
+function resolveApiBase(): string {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, '');
+  }
+
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    // On any production domain (such as Vercel *.vercel.app), use the Render backend
+    if (host !== 'localhost' && host !== '127.0.0.1' && !host.startsWith('192.168.') && !host.startsWith('10.')) {
+      return PRODUCTION_API_URL;
+    }
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    return PRODUCTION_API_URL;
+  }
+
+  return 'http://localhost:8000';
+}
+
+const API_BASE = resolveApiBase();
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -57,6 +80,10 @@ export async function getScanReport(scanId: string): Promise<ScanReport> {
 
 export async function getDemoSiteUrl(): Promise<{ url: string }> {
   return apiFetch<{ url: string }>('/api/demo-site-url');
+}
+
+export async function getDemoSites(): Promise<DemoSiteOption[]> {
+  return apiFetch<DemoSiteOption[]>('/api/demo-sites');
 }
 
 export async function getIssueDiff(scanId: string, issueId: string): Promise<{ diff: string; has_diff: boolean }> {

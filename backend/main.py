@@ -54,13 +54,48 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+cors_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "https://aura-autonomous-ui-remediation-oullh9ar2-cubic-closure.vercel.app",
+]
+
+frontend_url = os.getenv("FRONTEND_URL")
+if frontend_url:
+    cleaned = frontend_url.rstrip("/")
+    if cleaned not in cors_origins:
+        cors_origins.append(cleaned)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "*"],
+    allow_origins=cors_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/")
+async def root():
+    """Simple root health endpoint."""
+    return {
+        "status": "ok",
+        "message": "AURA backend is running",
+    }
+
+
+def get_backend_base_url() -> str:
+    """Return the canonical base URL for this server (supports Render cloud)."""
+    render_url = os.getenv("RENDER_EXTERNAL_URL")
+    if render_url:
+        return render_url.rstrip("/")
+    app_url = os.getenv("APP_URL") or os.getenv("BACKEND_URL")
+    if app_url:
+        return app_url.rstrip("/")
+    port = os.getenv("PORT", "8000")
+    return f"http://localhost:{port}"
 
 # Serve demo site static files
 demo_site_path = Path(__file__).resolve().parent.parent / "demo-site"
@@ -201,15 +236,14 @@ async def get_report(scan_id: str):
 @app.get("/api/demo-site-url")
 async def get_demo_site_url():
     """Return default demo site URL."""
-    port = os.getenv("PORT", "8000")
-    return {"url": f"http://localhost:{port}/demo-site/full_remediation.html"}
+    base = get_backend_base_url()
+    return {"url": f"{base}/demo-site/full_remediation.html"}
 
 
 @app.get("/api/demo-sites")
 async def get_demo_sites():
     """Return metadata for all built-in offline demo sites."""
-    port = os.getenv("PORT", "8000")
-    base = f"http://localhost:{port}/demo-site"
+    base = f"{get_backend_base_url()}/demo-site"
     return [
         {
             "id": "full_remediation",

@@ -1,8 +1,25 @@
 // AURA WebSocket Client for real-time agent timeline events
 
 import type { TimelineEvent } from './types';
+import { API_BASE } from './api';
 
-const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
+function resolveWsBase(): string {
+  if (process.env.NEXT_PUBLIC_WS_URL) {
+    return process.env.NEXT_PUBLIC_WS_URL.replace(/\/+$/, '');
+  }
+
+  if (API_BASE.startsWith('https://')) {
+    return API_BASE.replace('https://', 'wss://');
+  }
+
+  if (API_BASE.startsWith('http://')) {
+    return API_BASE.replace('http://', 'ws://');
+  }
+
+  return 'ws://localhost:8000';
+}
+
+const WS_BASE = resolveWsBase();
 
 export function connectScanWebSocket(
   scanId: string,
