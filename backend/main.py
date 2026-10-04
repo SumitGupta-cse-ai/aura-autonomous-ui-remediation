@@ -58,6 +58,7 @@ cors_origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:5173",
+    "https://aura-autonomous-ui-remediation.vercel.app",
     "https://aura-autonomous-ui-remediation-oullh9ar2-cubic-closure.vercel.app",
 ]
 

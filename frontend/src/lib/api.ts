@@ -35,18 +35,33 @@ export function getApiBase(): string {
 
 const API_BASE = getApiBase();
 
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+async function apiFetch<T>(path: string, options?: RequestInit, retries = 2): Promise<T> {
   const base = getApiBase();
   const url = `${base}${path.startsWith('/') ? path : '/' + path}`;
-  const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    ...options,
-  });
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(error.detail || `API Error: ${res.status}`);
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, {
+        headers: { 'Content-Type': 'application/json', ...options?.headers },
+        ...options,
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(error.detail || `API Error: ${res.status}`);
+      }
+      return await res.json();
+    } catch (err: unknown) {
+      const isNetworkError =
+        err instanceof TypeError ||
+        (err instanceof Error && (err.message.includes('fetch') || err.message.includes('network')));
+      if (attempt < retries && isNetworkError) {
+        await new Promise((r) => setTimeout(r, 1200));
+        continue;
+      }
+      throw err;
+    }
   }
-  return res.json();
+  throw new Error("Unable to connect to AURA API");
 }
 
 export async function startScan(url: string): Promise<ScanResponse> {

@@ -131,6 +131,18 @@ export default function DashboardPage() {
     };
   }, [currentScanId, fetchScan]);
 
+  // Polling fallback: guarantees timeline and issues update even if WebSocket drops
+  useEffect(() => {
+    if (!currentScanId) return;
+    if (scanData?.status === "complete" || scanData?.status === "error") return;
+
+    const interval = setInterval(() => {
+      fetchScan(currentScanId);
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [currentScanId, scanData?.status, fetchScan]);
+
   // Handle URL Form Scan Submit
   async function handleScanSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -151,6 +163,7 @@ export default function DashboardPage() {
 
     try {
       const response = await startScan(targetUrl);
+      setError("");
       setCurrentScanId(response.scan_id);
       setSelectedIssue(null);
       setTimeline([]);
@@ -180,6 +193,7 @@ export default function DashboardPage() {
     try {
       setUrl(targetUrl);
       const response = await startScan(targetUrl);
+      setError("");
       setCurrentScanId(response.scan_id);
       setSelectedIssue(null);
       setTimeline([]);
