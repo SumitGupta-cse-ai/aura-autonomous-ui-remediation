@@ -5,6 +5,8 @@ import time
 import uuid
 import os
 import difflib
+import sqlite3
+from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Callable, Awaitable
 
@@ -40,6 +42,10 @@ class Orchestrator:
         self._contexts: Dict[str, Any] = {}
         self._before_issues: Dict[str, List[Dict]] = {}
         self._scan_semaphore = asyncio.Semaphore(2)
+
+        self._db_path = Path(__file__).resolve().parent.parent / "aura_scans.db"
+        self._init_sqlite()
+        self._load_all_from_db()
 
     async def start(self):
         await self.browser_agent.start()
@@ -81,23 +87,89 @@ class Orchestrator:
             except Exception as e:
                 print(f"[Orchestrator] Event callback error: {e}")
 
+    def _init_sqlite(self):
+        try:
+            with sqlite3.connect(str(self._db_path)) as conn:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS scan_records (
+                        scan_id TEXT PRIMARY KEY,
+                        url TEXT,
+                        status TEXT,
+                        created_at TEXT,
+                        updated_at TEXT,
+                        data_json TEXT
+                    )
+                """)
+                conn.commit()
+        except Exception as e:
+            print(f"[Orchestrator] SQLite init error: {e}")
+
+    def _save_scan_to_db(self, scan: ScanData):
+        try:
+            now = datetime.utcnow().isoformat()
+            data_json = scan.model_dump_json()
+            with sqlite3.connect(str(self._db_path)) as conn:
+                conn.execute("""
+                    INSERT OR REPLACE INTO scan_records (scan_id, url, status, created_at, updated_at, data_json)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (scan.scan_id, scan.url, scan.status.value, scan.created_at, now, data_json))
+                conn.commit()
+        except Exception as e:
+            print(f"[Orchestrator] SQLite save error: {e}")
+
+    def _load_all_from_db(self):
+        try:
+            with sqlite3.connect(str(self._db_path)) as conn:
+                cursor = conn.execute("SELECT data_json FROM scan_records ORDER BY created_at ASC")
+                for row in cursor.fetchall():
+                    try:
+                        scan_data = ScanData.model_validate_json(row[0])
+                        self._scans[scan_data.scan_id] = scan_data
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"[Orchestrator] SQLite load error: {e}")
+
+    def register_pending_scan(self, scan: ScanData):
+        """Immediately register a new scan so that immediate polling finds it without 404."""
+        self._scans[scan.scan_id] = scan
+        self._save_scan_to_db(scan)
+
     def get_scan(self, scan_id: str) -> Optional[ScanData]:
-        return self._scans.get(scan_id)
+        if scan_id in self._scans:
+            return self._scans[scan_id]
+        # Query persistent SQLite storage in case of server restart or multi-worker deployment
+        try:
+            with sqlite3.connect(str(self._db_path)) as conn:
+                cursor = conn.execute("SELECT data_json FROM scan_records WHERE scan_id = ?", (scan_id,))
+                row = cursor.fetchone()
+                if row:
+                    scan_data = ScanData.model_validate_json(row[0])
+                    self._scans[scan_id] = scan_data
+                    return scan_data
+        except Exception:
+            pass
+        return None
 
     def get_all_scans(self) -> List[ScanData]:
+        self._load_all_from_db()
         return list(self._scans.values())
 
     async def run_scan(self, scan_id: str, url: str):
-        scan = ScanData(
-            scan_id=scan_id,
-            url=url,
-            status=ScanStatus.PENDING,
-            created_at=datetime.utcnow().isoformat(),
-        )
-        self._scans[scan_id] = scan
+        scan = self.get_scan(scan_id)
+        if not scan:
+            scan = ScanData(
+                scan_id=scan_id,
+                url=url,
+                status=ScanStatus.PENDING,
+                created_at=datetime.utcnow().isoformat(),
+            )
+            self._scans[scan_id] = scan
+        self._save_scan_to_db(scan)
 
         try:
             scan.status = ScanStatus.SCANNING
+            self._save_scan_to_db(scan)
             await self._emit_event(scan_id, TimelineEventType.ACTION, "Scan started", f"Target: {url}")
             await self._emit_event(scan_id, TimelineEventType.INFO, "URL validated")
 
@@ -182,8 +254,8 @@ class Orchestrator:
                 issues.append(issue)
             scan.issues = issues
             scan.summary = self._compute_summary(issues)
-
             scan.status = ScanStatus.ANALYZING
+            self._save_scan_to_db(scan)
             await self._emit_event(scan_id, TimelineEventType.ACTION, "AI analysis started", f"Analyzing {len(issues)} issues")
 
             async def _analyze_issue_task(iss: AccessibilityIssue):
@@ -212,6 +284,7 @@ class Orchestrator:
             scan.summary = self._compute_summary(issues)
             scan.status = ScanStatus.COMPLETE
             scan.completed_at = datetime.utcnow().isoformat()
+            self._save_scan_to_db(scan)
 
             await self._emit_event(scan_id, TimelineEventType.SUCCESS,
                                    "Scan complete",
@@ -222,12 +295,14 @@ class Orchestrator:
                                    f"{scan.summary.minor} minor")
 
         except Exception as e:
-            scan.status = ScanStatus.ERROR
+            if scan:
+                scan.status = ScanStatus.ERROR
+                self._save_scan_to_db(scan)
             await self._emit_event(scan_id, TimelineEventType.ERROR, f"Scan failed: {str(e)}")
             raise
 
     async def fix_issue(self, scan_id: str, issue_id: str) -> Dict[str, Any]:
-        scan = self._scans.get(scan_id)
+        scan = self.get_scan(scan_id)
         if not scan:
             return {"success": False, "error": "Scan not found"}
 
@@ -383,6 +458,7 @@ class Orchestrator:
                                    verification.details)
             self._before_issues[scan_id] = after_issues
             scan.summary = self._compute_summary(scan.issues)
+            self._save_scan_to_db(scan)
             return {
                 "success": True,
                 "issue_id": issue.id,
@@ -397,21 +473,26 @@ class Orchestrator:
             await self.browser_agent.apply_rollback(page, patch_result.rollback_js)
             issue.status = IssueStatus.ROLLED_BACK
             await self._emit_event(scan_id, TimelineEventType.INFO, "Patch rolled back — changes reverted")
-            scan = self._scans[scan_id]
-            scan.summary = self._compute_summary(scan.issues)
+            scan = self.get_scan(scan_id)
+            if scan:
+                scan.summary = self._compute_summary(scan.issues)
+                self._save_scan_to_db(scan)
             return {"success": False, "error": "Regression detected, patch rolled back"}
 
         else:
             # ROLLBACK: restore previous_patched_html to preserve previously verified fixes!
             page.patched_html = previous_patched_html
             await self.browser_agent.apply_rollback(page, patch_result.rollback_js)
+            scan = self.get_scan(scan_id)
+            if scan:
+                self._save_scan_to_db(scan)
             await self._emit_event(scan_id, TimelineEventType.WARNING,
                                    f"Verification failed — attempt {attempt}",
                                    verification.details)
             return {"success": False, "error": verification.details}
 
     async def fix_all_issues(self, scan_id: str) -> List[Dict[str, Any]]:
-        scan = self._scans.get(scan_id)
+        scan = self.get_scan(scan_id)
         if not scan:
             return [{"success": False, "error": "Scan not found"}]
 
@@ -436,7 +517,7 @@ class Orchestrator:
         return results
 
     def generate_report(self, scan_id: str) -> Optional[Dict[str, Any]]:
-        scan = self._scans.get(scan_id)
+        scan = self.get_scan(scan_id)
         if not scan:
             return None
 

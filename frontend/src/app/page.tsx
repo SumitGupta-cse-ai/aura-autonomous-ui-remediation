@@ -135,14 +135,14 @@ export default function DashboardPage() {
   // Polling fallback: guarantees timeline and issues update even if WebSocket drops
   useEffect(() => {
     if (!currentScanId) return;
-    if (scanData?.status === "complete" || scanData?.status === "error") return;
+    if (scanData && scanData.scan_id === currentScanId && (scanData.status === "complete" || scanData.status === "error")) return;
 
     const interval = setInterval(() => {
       fetchScan(currentScanId);
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [currentScanId, scanData?.status, fetchScan]);
+  }, [currentScanId, scanData?.status, scanData?.scan_id, fetchScan]);
 
   // Handle URL Form Scan Submit
   async function handleScanSubmit(e: React.FormEvent) {
@@ -165,9 +165,11 @@ export default function DashboardPage() {
     try {
       const response = await startScan(targetUrl);
       setError("");
+      setScanData(null);
       setCurrentScanId(response.scan_id);
       setSelectedIssue(null);
       setTimeline([]);
+      fetchScan(response.scan_id);
       setScanLoading(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to launch scan");
@@ -202,9 +204,11 @@ export default function DashboardPage() {
     try {
       const response = await startScan(targetUrl);
       setError("");
+      setScanData(null);
       setCurrentScanId(response.scan_id);
       setSelectedIssue(null);
       setTimeline([]);
+      fetchScan(response.scan_id);
     } catch (err) {
       console.error("[AURA Demo Scan Error]:", err);
       setError(err instanceof Error ? err.message : "Failed to launch scan. Please click 'Scan Website' to retry.");
@@ -576,7 +580,9 @@ export default function DashboardPage() {
                     <div
                       key={hScan.scan_id}
                       onClick={() => {
+                        setScanData(null);
                         setCurrentScanId(hScan.scan_id);
+                        fetchScan(hScan.scan_id);
                         const scannerEl = document.getElementById("scanner");
                         scannerEl?.scrollIntoView({ behavior: "smooth" });
                       }}

@@ -42,6 +42,11 @@ async function apiFetch<T>(path: string, options?: RequestInit, retries = 3): Pr
         ...options,
       });
       if (!res.ok) {
+        // If a newly created scan is being polled right away, handle 404 with progressive backoff retry
+        if (res.status === 404 && path.startsWith('/api/scan/') && attempt < retries) {
+          await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+          continue;
+        }
         const error = await res.json().catch(() => ({ detail: res.statusText }));
         throw new Error(error.detail || `API Error: ${res.status}`);
       }

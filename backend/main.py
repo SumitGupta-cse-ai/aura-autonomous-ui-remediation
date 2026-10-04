@@ -151,6 +151,15 @@ async def start_scan(request: ScanRequest, background_tasks: BackgroundTasks):
     scan_id = str(uuid.uuid4())[:12]
     created_at = datetime.utcnow().isoformat()
 
+    # Pre-register the scan synchronously so that immediate client polling NEVER gets 404
+    pending_scan = ScanData(
+        scan_id=scan_id,
+        url=url,
+        status=ScanStatus.PENDING,
+        created_at=created_at,
+    )
+    orchestrator.register_pending_scan(pending_scan)
+
     background_tasks.add_task(_run_scan_task, scan_id, url)
 
     return ScanResponse(
