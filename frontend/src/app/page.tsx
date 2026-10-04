@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopHeader } from "@/components/layout/TopHeader";
 import { HeroBanner } from "@/components/dashboard/HeroBanner";
@@ -28,6 +28,7 @@ import {
 import { connectScanWebSocket } from "@/lib/websocket";
 import type {
   ScanData,
+  ScanSummary,
   AccessibilityIssue,
   TimelineEvent,
   ScanReport,
@@ -311,6 +312,43 @@ export default function DashboardPage() {
   const unresolvedCount = issues.filter((i) => i.status === "unresolved").length;
   const fixedCount = issues.filter((i) => i.status === "fixed").length;
 
+  // Real-time computed summary: instantly guarantees non-zero accurate counts even during initial analyzing or WebSocket lag
+  const computedSummary: ScanSummary = useMemo(() => {
+    const issuesList = scanData?.issues || [];
+    if (issuesList.length > 0) {
+      const critical = issuesList.filter((i) => i.severity === "critical").length;
+      const serious = issuesList.filter((i) => i.severity === "serious").length;
+      const moderate = issuesList.filter((i) => i.severity === "moderate").length;
+      const minor = issuesList.filter((i) => i.severity === "minor").length;
+      const fixed = issuesList.filter((i) => i.status === "fixed").length;
+      const unresolved = issuesList.filter((i) => i.status !== "fixed" && i.status !== "needs_review").length;
+      const needs_review = issuesList.filter((i) => i.status === "needs_review").length;
+
+      return {
+        total_issues: issuesList.length,
+        critical,
+        serious,
+        moderate,
+        minor,
+        fixed,
+        unresolved,
+        needs_review,
+      };
+    }
+    return (
+      scanData?.summary || {
+        total_issues: 0,
+        critical: 0,
+        serious: 0,
+        moderate: 0,
+        minor: 0,
+        fixed: 0,
+        unresolved: 0,
+        needs_review: 0,
+      }
+    );
+  }, [scanData?.summary, scanData?.issues]);
+
   return (
     <div className="flex min-h-screen bg-[#0b1117] text-[#f8fafc] transition-colors duration-150">
       {/* Left Sidebar (Desktop sticky + Mobile slide-out drawer) */}
@@ -371,7 +409,7 @@ export default function DashboardPage() {
 
           {/* Section 2: Summary Metrics Row */}
           <SummaryMetrics
-            summary={scanData?.summary}
+            summary={computedSummary}
             scanStatus={scanData?.status || "ready"}
             onSelectFilter={(newFilter) => setFilter(newFilter)}
             onOpenDocs={() => setIsDocsOpen(true)}

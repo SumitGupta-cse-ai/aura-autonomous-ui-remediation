@@ -229,7 +229,7 @@ export function BeforeAfterComparison({
                     <img
                       src={getSafeImageSrc(selectedIssue.before_screenshot)}
                       alt="Before fix screenshot"
-                      className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-200 cursor-pointer"
+                      className="w-full h-full object-contain hover:scale-105 transition-transform duration-200 cursor-pointer p-0.5"
                       onClick={() =>
                         setZoomImage({
                           src: getSafeImageSrc(selectedIssue.before_screenshot),
@@ -304,7 +304,7 @@ export function BeforeAfterComparison({
                     <img
                       src={getSafeImageSrc(selectedIssue.after_screenshot)}
                       alt="After fix screenshot"
-                      className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-200 cursor-pointer"
+                      className="w-full h-full object-contain hover:scale-105 transition-transform duration-200 cursor-pointer p-0.5"
                       onClick={() =>
                         setZoomImage({
                           src: getSafeImageSrc(selectedIssue.after_screenshot),

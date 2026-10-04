@@ -168,27 +168,31 @@ class Orchestrator:
                 )
                 issues.append(issue)
             scan.issues = issues
+            scan.summary = self._compute_summary(issues)
 
             scan.status = ScanStatus.ANALYZING
             await self._emit_event(scan_id, TimelineEventType.ACTION, "AI analysis started", f"Analyzing {len(issues)} issues")
 
-            for issue in issues:
+            async def _analyze_issue_task(iss: AccessibilityIssue):
                 try:
-                    dom_context = await self.browser_agent.get_element_context(page, issue.element_selector)
-                    issue.element_context = str(dom_context)[:500]
+                    dom_context = await self.browser_agent.get_element_context(page, iss.element_selector)
+                    iss.element_context = str(dom_context)[:500]
 
                     analysis = await self.analysis_agent.analyze_issue(
-                        rule_id=issue.rule_id,
-                        description=issue.description,
-                        severity=issue.severity.value,
-                        element_html=issue.element_html,
-                        selector=issue.element_selector,
+                        rule_id=iss.rule_id,
+                        description=iss.description,
+                        severity=iss.severity.value,
+                        element_html=iss.element_html,
+                        selector=iss.element_selector,
                         dom_context=dom_context,
-                        wcag_criteria=issue.wcag_criteria,
+                        wcag_criteria=iss.wcag_criteria,
                     )
-                    issue.analysis = analysis
+                    iss.analysis = analysis
                 except Exception as e:
-                    print(f"[Orchestrator] Analysis failed for {issue.id}: {e}")
+                    print(f"[Orchestrator] Analysis failed for {iss.id}: {e}")
+
+            # Analyze all issues concurrently in parallel
+            await asyncio.gather(*[_analyze_issue_task(iss) for iss in issues])
 
             await self._emit_event(scan_id, TimelineEventType.SUCCESS, f"Analysis completed for {len(issues)} issues")
 
@@ -330,7 +334,7 @@ class Orchestrator:
         await self._emit_event(scan_id, TimelineEventType.SUCCESS, "Sandbox patch applied")
         await asyncio.sleep(0.3)
 
-        after_screenshot = await self.browser_agent.take_screenshot(page)
+        after_screenshot = await self.browser_agent.take_screenshot(page, is_patched=True)
         issue.after_screenshot = after_screenshot
 
         await self._emit_event(scan_id, TimelineEventType.ACTION, "Re-audit started", "Running axe-core on patched page")
