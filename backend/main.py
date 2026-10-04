@@ -1,6 +1,10 @@
 """AURA FastAPI Application — REST API + WebSocket for the Autonomous UI Remediation Agent."""
 
+import sys
 import asyncio
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
 import uuid
 import os
 import json

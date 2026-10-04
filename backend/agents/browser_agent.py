@@ -1,6 +1,13 @@
 """AURA Browser Agent — Playwright browser automation + axe-core accessibility auditing + Sandbox patching."""
 
+import sys
 import asyncio
+if sys.platform == "win32":
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    except Exception:
+        pass
+
 import base64
 import uuid
 import time
@@ -128,24 +135,26 @@ class BrowserAgent:
         """Load a page with proper timeouts and wait for readiness.
         Works for: demo sites, localhost dev servers, and public HTTPS websites.
         """
+        clean_url = url.replace("localhost:", "127.0.0.1:") if "localhost:" in url else url
+
         if self.use_fallback or context is None:
-            return await self._load_page_http_fallback(url)
+            return await self._load_page_http_fallback(clean_url)
 
         page = await context.new_page()
         try:
-            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            await page.goto(clean_url, wait_until="domcontentloaded", timeout=30000)
             try:
                 await page.wait_for_load_state("networkidle", timeout=10000)
             except Exception:
                 pass  # networkidle is best-effort; domcontentloaded is sufficient
         except Exception as e:
             # Playwright navigation failed — fall back to HTTP fetch
-            print(f"[BrowserAgent] Playwright navigation failed for {url}: {e}")
+            print(f"[BrowserAgent] Playwright navigation failed for {clean_url}: {e}")
             try:
                 await page.close()
             except Exception:
                 pass
-            return await self._load_page_http_fallback(url)
+            return await self._load_page_http_fallback(clean_url)
 
         # Store the initial HTML for the patching pipeline
         try:
@@ -159,6 +168,7 @@ class BrowserAgent:
 
     async def _load_page_http_fallback(self, url: str) -> MockPage:
         """HTTP fallback for loading pages when Playwright is unavailable."""
+        clean_url = url.replace("localhost:", "127.0.0.1:") if "localhost:" in url else url
         try:
             async with httpx.AsyncClient(
                 follow_redirects=True,
@@ -169,35 +179,76 @@ class BrowserAgent:
                     "Accept": "text/html,application/xhtml+xml,*/*",
                 },
             ) as client:
-                resp = await client.get(url)
+                resp = await client.get(clean_url)
                 resp.raise_for_status()
-                page = MockPage(url=url, html_content=resp.text)
+                page = MockPage(url=clean_url, html_content=resp.text)
                 return page
         except httpx.TimeoutException:
-            raise RuntimeError(f"Timeout loading {url} — site did not respond within 20 seconds")
+            raise RuntimeError(f"Timeout loading {clean_url} — site did not respond within 20 seconds")
         except httpx.ConnectError as e:
-            raise RuntimeError(f"Could not connect to {url} — {e}")
+            raise RuntimeError(f"Could not connect to {clean_url} — {e}")
         except httpx.HTTPStatusError as e:
-            raise RuntimeError(f"HTTP {e.response.status_code} from {url} — {e.response.reason_phrase}")
+            raise RuntimeError(f"HTTP {e.response.status_code} from {clean_url} — {e.response.reason_phrase}")
         except Exception as e:
-            raise RuntimeError(f"Failed to load {url}: {e}")
+            raise RuntimeError(f"Failed to load {clean_url}: {e}")
+
+    async def _screenshot_from_html(self, html: str) -> Optional[str]:
+        """Render HTML string in a temporary Playwright context to get a 100% real PNG screenshot."""
+        if not HAS_PLAYWRIGHT or not html:
+            return None
+        try:
+            if not self._browser:
+                await self.start()
+            if not self._browser:
+                return None
+
+            ctx = await self._browser.new_context(
+                viewport={"width": 1280, "height": 900},
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AURA-Scanner/1.0"
+            )
+            render_page = await ctx.new_page()
+            try:
+                await render_page.set_content(html, wait_until="load", timeout=8000)
+                shot = await render_page.screenshot(full_page=False, type="png")
+                b64 = base64.b64encode(shot).decode("utf-8")
+                return f"data:image/png;base64,{b64}"
+            finally:
+                try:
+                    await render_page.close()
+                    await ctx.close()
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"[BrowserAgent] _screenshot_from_html failed: {e}")
+            return None
 
     async def take_screenshot(self, page: Any) -> str:
-        """Take a screenshot and return as base64 data URL."""
-        if isinstance(page, MockPage) or self.use_fallback:
-            placeholder_svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450">
-                <rect width="800" height="450" fill="#0f1720"/>
-                <text x="400" y="225" fill="#10b981" font-family="sans-serif" font-size="20" text-anchor="middle">AURA Sandbox Preview: {page.url[:40]}</text>
-            </svg>"""
-            b64 = base64.b64encode(placeholder_svg.encode("utf-8")).decode("utf-8")
-            return f"data:image/svg+xml;base64,{b64}"
+        """Take a screenshot and return as base64 data URL. Always delivers a real PNG when possible."""
+        # 1. Direct Playwright page screenshot if page is a live Page
+        if hasattr(page, "screenshot") and not isinstance(page, MockPage):
+            try:
+                screenshot_bytes = await page.screenshot(full_page=False, type="png")
+                if screenshot_bytes:
+                    b64 = base64.b64encode(screenshot_bytes).decode("utf-8")
+                    return f"data:image/png;base64,{b64}"
+            except Exception as e:
+                print(f"[BrowserAgent] page.screenshot failed: {e}")
 
-        try:
-            screenshot_bytes = await page.screenshot(full_page=False, type="png")
-            b64 = base64.b64encode(screenshot_bytes).decode("utf-8")
-            return f"data:image/png;base64,{b64}"
-        except Exception:
-            return ""
+        # 2. Render from HTML (works for MockPage, sandboxed HTML, or patched pages)
+        html = getattr(page, "patched_html", getattr(page, "html_content", ""))
+        if html:
+            b64_png = await self._screenshot_from_html(html)
+            if b64_png:
+                return b64_png
+
+        # 3. Clean fallback preview
+        url_label = getattr(page, "url", "AURA Sandbox")[:40]
+        placeholder_svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450">
+            <rect width="800" height="450" fill="#0f1720"/>
+            <text x="400" y="225" fill="#10b981" font-family="sans-serif" font-size="20" text-anchor="middle">AURA Sandbox: {url_label}</text>
+        </svg>"""
+        b64 = base64.b64encode(placeholder_svg.encode("utf-8")).decode("utf-8")
+        return f"data:image/svg+xml;base64,{b64}"
 
     async def run_axe_audit(self, page: Any) -> List[Dict[str, Any]]:
         """Inject axe-core and run accessibility audit. Returns list of violation dicts."""
