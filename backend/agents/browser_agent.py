@@ -135,7 +135,32 @@ class BrowserAgent:
         """Load a page with proper timeouts and wait for readiness.
         Works for: demo sites, localhost dev servers, and public HTTPS websites.
         """
-        clean_url = url.replace("localhost:", "127.0.0.1:") if "localhost:" in url else url
+        # 1. Built-in demo site direct resolution (guarantees 100% success on any port/cloud)
+        if "/demo-site/" in url:
+            filename = url.split("/demo-site/")[-1].split("?")[0].split("#")[0]
+            demo_dir = Path(__file__).resolve().parent.parent.parent / "demo-site"
+            local_file = demo_dir / filename
+            if not local_file.exists():
+                local_file = Path(__file__).resolve().parent.parent / "demo-site" / filename
+            if local_file.exists():
+                html = local_file.read_text(encoding="utf-8")
+                if context and not self.use_fallback:
+                    try:
+                        page = await context.new_page()
+                        await page.set_content(html, wait_until="domcontentloaded")
+                        page.html_content = html
+                        page.patched_html = html
+                        return page
+                    except Exception:
+                        pass
+                return MockPage(url=url, html_content=html)
+
+        # 2. Port rewrite for cloud deployment (e.g. Render where PORT is not 8000)
+        current_port = os.getenv("PORT", "8000")
+        clean_url = url
+        if current_port != "8000":
+            clean_url = re.sub(r'https?://(localhost|127\.0\.0\.1):8000', f'http://127.0.0.1:{current_port}', clean_url)
+        clean_url = clean_url.replace("localhost:", "127.0.0.1:") if "localhost:" in clean_url else clean_url
 
         if self.use_fallback or context is None:
             return await self._load_page_http_fallback(clean_url)
@@ -168,7 +193,21 @@ class BrowserAgent:
 
     async def _load_page_http_fallback(self, url: str) -> MockPage:
         """HTTP fallback for loading pages when Playwright is unavailable."""
-        clean_url = url.replace("localhost:", "127.0.0.1:") if "localhost:" in url else url
+        if "/demo-site/" in url:
+            filename = url.split("/demo-site/")[-1].split("?")[0].split("#")[0]
+            demo_dir = Path(__file__).resolve().parent.parent.parent / "demo-site"
+            local_file = demo_dir / filename
+            if not local_file.exists():
+                local_file = Path(__file__).resolve().parent.parent / "demo-site" / filename
+            if local_file.exists():
+                html = local_file.read_text(encoding="utf-8")
+                return MockPage(url=url, html_content=html)
+
+        current_port = os.getenv("PORT", "8000")
+        clean_url = url
+        if current_port != "8000":
+            clean_url = re.sub(r'https?://(localhost|127\.0\.0\.1):8000', f'http://127.0.0.1:{current_port}', clean_url)
+        clean_url = clean_url.replace("localhost:", "127.0.0.1:") if "localhost:" in clean_url else clean_url
         try:
             async with httpx.AsyncClient(
                 follow_redirects=True,
@@ -184,8 +223,20 @@ class BrowserAgent:
                 page = MockPage(url=clean_url, html_content=resp.text)
                 return page
         except httpx.TimeoutException:
+            if "/demo-site/" in url:
+                filename = url.split("/demo-site/")[-1].split("?")[0].split("#")[0]
+                demo_dir = Path(__file__).resolve().parent.parent.parent / "demo-site"
+                local_file = demo_dir / filename
+                if local_file.exists():
+                    return MockPage(url=url, html_content=local_file.read_text(encoding="utf-8"))
             raise RuntimeError(f"Timeout loading {clean_url} — site did not respond within 20 seconds")
         except httpx.ConnectError as e:
+            if "/demo-site/" in url:
+                filename = url.split("/demo-site/")[-1].split("?")[0].split("#")[0]
+                demo_dir = Path(__file__).resolve().parent.parent.parent / "demo-site"
+                local_file = demo_dir / filename
+                if local_file.exists():
+                    return MockPage(url=url, html_content=local_file.read_text(encoding="utf-8"))
             raise RuntimeError(f"Could not connect to {clean_url} — {e}")
         except httpx.HTTPStatusError as e:
             raise RuntimeError(f"HTTP {e.response.status_code} from {clean_url} — {e.response.reason_phrase}")

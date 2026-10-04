@@ -22,6 +22,7 @@ import {
   getScanReport,
   getDemoSiteUrl,
   getDemoSites,
+  getApiBase,
   API_BASE,
 } from "@/lib/api";
 import { connectScanWebSocket } from "@/lib/websocket";
@@ -140,8 +141,16 @@ export default function DashboardPage() {
     setError("");
     setScanLoading(true);
 
+    let targetUrl = url.trim();
+    // Auto-normalize any demo-site URL to the active backend so it works everywhere
+    if (targetUrl.includes("/demo-site/")) {
+      const demoPath = targetUrl.substring(targetUrl.indexOf("/demo-site/"));
+      targetUrl = `${getApiBase()}${demoPath}`;
+      setUrl(targetUrl);
+    }
+
     try {
-      const response = await startScan(url.trim());
+      const response = await startScan(targetUrl);
       setCurrentScanId(response.scan_id);
       setSelectedIssue(null);
       setTimeline([]);
@@ -161,9 +170,16 @@ export default function DashboardPage() {
   async function handleSelectDemoSite(demoUrl: string) {
     setDemoLoading(true);
     setError("");
+
+    let targetUrl = demoUrl;
+    if (targetUrl.includes("/demo-site/")) {
+      const demoPath = targetUrl.substring(targetUrl.indexOf("/demo-site/"));
+      targetUrl = `${getApiBase()}${demoPath}`;
+    }
+
     try {
-      setUrl(demoUrl);
-      const response = await startScan(demoUrl);
+      setUrl(targetUrl);
+      const response = await startScan(targetUrl);
       setCurrentScanId(response.scan_id);
       setSelectedIssue(null);
       setTimeline([]);
