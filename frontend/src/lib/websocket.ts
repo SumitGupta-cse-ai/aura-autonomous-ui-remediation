@@ -1,25 +1,24 @@
 // AURA WebSocket Client for real-time agent timeline events
 
 import type { TimelineEvent } from './types';
-import { API_BASE } from './api';
+import { getApiBase } from './api';
 
-function resolveWsBase(): string {
+export function resolveWsBase(): string {
   if (process.env.NEXT_PUBLIC_WS_URL) {
     return process.env.NEXT_PUBLIC_WS_URL.replace(/\/+$/, '');
   }
 
-  if (API_BASE.startsWith('https://')) {
-    return API_BASE.replace('https://', 'wss://');
+  const base = getApiBase();
+  if (base.startsWith('https://')) {
+    return base.replace('https://', 'wss://');
   }
 
-  if (API_BASE.startsWith('http://')) {
-    return API_BASE.replace('http://', 'ws://');
+  if (base.startsWith('http://')) {
+    return base.replace('http://', 'ws://');
   }
 
   return 'ws://localhost:8000';
 }
-
-const WS_BASE = resolveWsBase();
 
 export function connectScanWebSocket(
   scanId: string,
@@ -28,7 +27,8 @@ export function connectScanWebSocket(
   onError?: (error: Event) => void,
   onClose?: () => void
 ): WebSocket {
-  const ws = new WebSocket(`${WS_BASE}/ws/scan/${scanId}`);
+  const wsBase = resolveWsBase();
+  const ws = new WebSocket(`${wsBase}/ws/scan/${scanId}`);
 
   ws.onopen = () => {
     console.log(`[AURA WS] Connected to scan ${scanId}`);

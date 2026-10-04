@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Activity, Server, Cpu, Database, ChevronDown } from "lucide-react";
-import { API_BASE } from "@/lib/api";
+import { getApiBase } from "@/lib/api";
 
 interface ConnectionStatusProps {
   apiBaseUrl?: string;
@@ -11,7 +11,7 @@ interface ConnectionStatusProps {
 export type ConnectionState = "online" | "checking" | "offline";
 
 export function ConnectionStatus({ apiBaseUrl }: ConnectionStatusProps) {
-  const effectiveBaseUrl = (apiBaseUrl || API_BASE).replace(/\/+$/, "");
+  const effectiveBaseUrl = (apiBaseUrl || getApiBase()).replace(/\/+$/, "");
   const [status, setStatus] = useState<ConnectionState>("online");
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [healthData, setHealthData] = useState<{

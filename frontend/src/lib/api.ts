@@ -10,11 +10,8 @@ import type { DemoSiteOption } from '@/components/dashboard/DemoSelectorModal';
 
 export const PRODUCTION_API_URL = 'https://aura-autonomous-ui-remediation.onrender.com';
 
-function resolveApiBase(): string {
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, '');
-  }
-
+export function getApiBase(): string {
+  // 1. In browser runtime: Check hostname
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
     // On any production domain (such as Vercel *.vercel.app), use the Render backend
@@ -23,17 +20,25 @@ function resolveApiBase(): string {
     }
   }
 
+  // 2. Check environment variables
+  const envUrl = process.env.NEXT_PUBLIC_API_URL || process.env.VITE_API_URL;
+  if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
+    return envUrl.replace(/\/+$/, '');
+  }
+
   if (process.env.NODE_ENV === 'production') {
     return PRODUCTION_API_URL;
   }
 
-  return 'http://localhost:8000';
+  return envUrl ? envUrl.replace(/\/+$/, '') : 'http://localhost:8000';
 }
 
-const API_BASE = resolveApiBase();
+const API_BASE = getApiBase();
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const base = getApiBase();
+  const url = `${base}${path.startsWith('/') ? path : '/' + path}`;
+  const res = await fetch(url, {
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     ...options,
   });
@@ -91,15 +96,15 @@ export async function getIssueDiff(scanId: string, issueId: string): Promise<{ d
 }
 
 export function getSandboxUrl(scanId: string): string {
-  return `${API_BASE}/sandbox/${scanId}`;
+  return `${getApiBase()}/sandbox/${scanId}`;
 }
 
 export function getDownloadPatchUrl(scanId: string): string {
-  return `${API_BASE}/api/scan/${scanId}/download`;
+  return `${getApiBase()}/api/scan/${scanId}/download`;
 }
 
 export function getDownloadReportUrl(scanId: string): string {
-  return `${API_BASE}/api/scan/${scanId}/report/download`;
+  return `${getApiBase()}/api/scan/${scanId}/report/download`;
 }
 
 export { API_BASE };
