@@ -6,7 +6,7 @@ AURA is an AI-assisted accessibility remediation agent that doesn't just find ac
 
 🚀 Live Demo
 
-"Try AURA Live →" (https://aura-autonomous-ui-remediation-oullh9ar2-cubic-closure.vercel.app/)
+"Try AURA Live →" https://aura-autonomous-ui-remediation.vercel.app/
 
 «Built for WCC Launchpad 30 — Agentic AI Track»
 
