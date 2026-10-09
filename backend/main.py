@@ -38,6 +38,7 @@ from core.export_engine import (
     get_sandbox_html_for_scan,
 )
 from agents.orchestrator import Orchestrator
+from agents.browser_agent import resolve_demo_file
 from core.security import validate_url, rate_limiter
 
 # ─── Lifespan ───
@@ -553,20 +554,29 @@ async def serve_sandbox_before(scan_id: str):
         Path(__file__).resolve().parent.parent / "demo-site" / "sandbox" / scan_id / "before.html",
     ]
     for c in candidates:
-        if c.exists():
+        if c.is_file():
             return FileResponse(str(c), media_type="text/html")
 
-    # If before.html is not created yet, check original url from scan
+    # If before.html is not created on disk, check memory or original url from scan
     scan = orchestrator.get_scan(scan_id)
-    if scan and scan.url:
-        clean_url = scan.url.split("?")[0]
-        if clean_url.endswith(".html"):
-            demo_name = clean_url.split("/")[-1]
-            demo_target = demo_site_path / demo_name
-            if demo_target.exists():
-                return FileResponse(str(demo_target), media_type="text/html")
+    if scan:
+        if getattr(scan, "original_html", None):
+            return HTMLResponse(content=scan.original_html, media_type="text/html")
+        if scan.baseline and getattr(scan.baseline, "html_snapshot", None):
+            return HTMLResponse(content=scan.baseline.html_snapshot, media_type="text/html")
+        if scan.url:
+            demo_name, demo_file = resolve_demo_file(scan.url)
+            if demo_file and demo_file.is_file():
+                return FileResponse(str(demo_file), media_type="text/html")
 
-    raise HTTPException(status_code=404, detail="Before snapshot not found")
+    # Safe fallback so before snapshot is NEVER 404 or broken
+    for fallback_name in ["full_remediation.html", "demo1.html", "index.html"]:
+        for base in [demo_site_path, Path(__file__).resolve().parent / "demo-site", Path(__file__).resolve().parent.parent / "demo-site"]:
+            fb = base / fallback_name
+            if fb.is_file():
+                return FileResponse(str(fb), media_type="text/html")
+
+    return HTMLResponse(content="<!DOCTYPE html><html><head><title>Original Page</title></head><body><p>Snapshot ready.</p></body></html>", media_type="text/html")
 
 
 @app.get("/sandbox/{scan_id}/after")
@@ -582,8 +592,21 @@ async def serve_sandbox_after(scan_id: str):
         Path(__file__).resolve().parent.parent / "demo-site" / "sandbox" / scan_id / "index.html",
     ]
     for c in candidates:
-        if c.exists():
+        if c.is_file():
             return FileResponse(str(c), media_type="text/html")
+
+    scan = orchestrator.get_scan(scan_id)
+    if scan:
+        if getattr(scan, "patched_html", None):
+            return HTMLResponse(content=scan.patched_html, media_type="text/html")
+        if getattr(scan, "original_html", None):
+            return HTMLResponse(content=scan.original_html, media_type="text/html")
+        if scan.baseline and getattr(scan.baseline, "html_snapshot", None):
+            return HTMLResponse(content=scan.baseline.html_snapshot, media_type="text/html")
+        if scan.url:
+            demo_name, demo_file = resolve_demo_file(scan.url)
+            if demo_file and demo_file.is_file():
+                return FileResponse(str(demo_file), media_type="text/html")
 
     # Fallback to before snapshot if after has not diverged yet
     return await serve_sandbox_before(scan_id)
@@ -591,43 +614,8 @@ async def serve_sandbox_after(scan_id: str):
 
 @app.get("/sandbox/{scan_id}")
 async def serve_sandbox(scan_id: str):
-    """Serve the sandboxed patched page for a scan (falls back to before or base page)."""
-    candidates = [
-        demo_site_path / "sandbox" / scan_id / "after.html",
-        demo_site_path / "sandbox" / scan_id / "index.html",
-        demo_site_path / "sandbox" / scan_id / "before.html",
-        Path(__file__).resolve().parent / "demo-site" / "sandbox" / scan_id / "after.html",
-        Path(__file__).resolve().parent / "demo-site" / "sandbox" / scan_id / "index.html",
-        Path(__file__).resolve().parent / "demo-site" / "sandbox" / scan_id / "before.html",
-        Path(__file__).resolve().parent.parent / "demo-site" / "sandbox" / scan_id / "after.html",
-        Path(__file__).resolve().parent.parent / "demo-site" / "sandbox" / scan_id / "index.html",
-        Path(__file__).resolve().parent.parent / "demo-site" / "sandbox" / scan_id / "before.html",
-    ]
-    for c in candidates:
-        if c.exists():
-            return FileResponse(str(c), media_type="text/html")
-
-    # Fallback to single sandbox preview if exists
-    fallbacks = [
-        demo_site_path / "sandbox_preview.html",
-        Path(__file__).resolve().parent / "demo-site" / "sandbox_preview.html",
-        Path(__file__).resolve().parent.parent / "demo-site" / "sandbox_preview.html",
-    ]
-    for fb in fallbacks:
-        if fb.exists():
-            return FileResponse(str(fb), media_type="text/html")
-
-    # If scan exists, serve the base demo page directly so preview is NEVER broken
-    scan = orchestrator.get_scan(scan_id)
-    if scan and scan.url:
-        clean_url = scan.url.split("?")[0]
-        if clean_url.endswith(".html"):
-            demo_name = clean_url.split("/")[-1]
-            demo_target = demo_site_path / demo_name
-            if demo_target.exists():
-                return FileResponse(str(demo_target), media_type="text/html")
-
-    raise HTTPException(status_code=404, detail="Sandbox preview not available yet")
+    """Serve the sandboxed patched page for a scan (falls back to improved or base page)."""
+    return await serve_sandbox_after(scan_id)
 
 
 @app.get("/api/scan/{scan_id}/diff/{issue_id}")

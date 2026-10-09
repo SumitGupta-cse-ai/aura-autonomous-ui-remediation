@@ -310,8 +310,9 @@ class BrowserAgent:
             page.cookie_banner_dismissed = False
 
         # 5. Security Challenge / CAPTCHA / Bot Protection Detection
-        page.security_challenge_detected = False
-        page.security_challenge_reason = None
+        if not getattr(page, "security_challenge_detected", False):
+            page.security_challenge_detected = False
+            page.security_challenge_reason = None
         try:
             challenge_info = await self.detect_security_challenge(page)
             if challenge_info.get("detected"):
@@ -386,11 +387,18 @@ class BrowserAgent:
             return False
 
     async def detect_security_challenge(self, page: Any) -> Dict[str, Any]:
-        """Detect CAPTCHA, Cloudflare Turnstile/challenge, or anti-bot verification blocking access."""
+        """Detect CAPTCHA, Cloudflare Turnstile/challenge, Akamai, or anti-bot verification blocking access."""
+        if getattr(page, "security_challenge_detected", False):
+            return {"detected": True, "reason": getattr(page, "security_challenge_reason", "Target server access restricted (Bot Shield active)")}
+
         if not hasattr(page, "evaluate") or isinstance(page, MockPage):
             html = getattr(page, "html_content", "").lower()
-            if "attention required! | cloudflare" in html or "cf-browser-verification" in html or "recaptcha" in html:
-                return {"detected": True, "reason": "Cloudflare / Bot challenge page detected"}
+            if any(sig in html for sig in [
+                "attention required! | cloudflare", "cf-browser-verification", "recaptcha",
+                "akamai", "sec-if-cpt", "scf-akamai", "/akam/", "access denied", "403 forbidden",
+                "just a moment...", "turnstile", "datadome", "perimeterx", "px-captcha"
+            ]):
+                return {"detected": True, "reason": "Target security challenge / Bot verification active"}
             return {"detected": False}
 
         try:
@@ -409,7 +417,12 @@ class BrowserAgent:
                         return { detected: true, reason: 'Human verification / CAPTCHA challenge required' };
                     }
                 }
-                if (title.includes('403 forbidden') && (bodyText.includes('access denied') || bodyText.includes('blocked'))) {
+                if (html.includes('akamai') || html.includes('sec-if-cpt') || html.includes('datadome') || html.includes('perimeterx') || html.includes('px-captcha')) {
+                    if (bodyText.includes('access denied') || bodyText.includes('verify you are human') || bodyText.includes('challenge') || bodyText.includes('security') || title.includes('access denied')) {
+                        return { detected: true, reason: 'Target security challenge / Bot verification active' };
+                    }
+                }
+                if ((title.includes('403 forbidden') || title.includes('access denied')) && (bodyText.includes('access denied') || bodyText.includes('blocked') || bodyText.includes("don't have permission"))) {
                     return { detected: true, reason: 'Target server access restricted (403 Forbidden)' };
                 }
                 return { detected: false };
@@ -567,16 +580,35 @@ class BrowserAgent:
             clean_url = re.sub(r'https?://(localhost|127\.0\.0\.1):8000', f'http://127.0.0.1:{current_port}', clean_url)
         clean_url = clean_url.replace("localhost:", "127.0.0.1:") if "localhost:" in clean_url else clean_url
         try:
+            browser_headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Sec-Ch-Ua": '"Not/A)Brand";v="8", "Chromium";v="126", "Google Chrome";v="126"',
+                "Sec-Ch-Ua-Mobile": "?0",
+                "Sec-Ch-Ua-Platform": '"Windows"',
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-User": "?1",
+                "Upgrade-Insecure-Requests": "1",
+            }
             async with httpx.AsyncClient(
                 follow_redirects=True,
                 timeout=20.0,
                 verify=False,  # Allow self-signed certs on dev servers
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AURA-Scanner/1.0",
-                    "Accept": "text/html,application/xhtml+xml,*/*",
-                },
+                headers=browser_headers,
             ) as client:
                 resp = await client.get(clean_url)
+                if resp.status_code in (401, 403, 429):
+                    page = MockPage(
+                        url=clean_url,
+                        html_content=resp.text or f"<html><head><title>Access Restricted</title></head><body><h1>Access Restricted (HTTP {resp.status_code})</h1><p>Target host requires interactive human verification.</p></body></html>"
+                    )
+                    page.security_challenge_detected = True
+                    page.security_challenge_reason = f"Target host returned HTTP {resp.status_code} Access Restricted (Anti-Bot / WAF Shield active)"
+                    return page
+
                 resp.raise_for_status()
                 page = MockPage(url=clean_url, html_content=resp.text)
                 return page
@@ -589,6 +621,14 @@ class BrowserAgent:
                 return MockPage(url=f"https://aura-bundled-demo.local/demo-site/{demo_name}", html_content=local_file.read_text(encoding="utf-8"))
             raise RuntimeError(f"Could not connect to {clean_url} — {e}")
         except httpx.HTTPStatusError as e:
+            if e.response.status_code in (401, 403, 429):
+                page = MockPage(
+                    url=clean_url,
+                    html_content=e.response.text or f"<html><head><title>Access Restricted</title></head><body><h1>Access Restricted (HTTP {e.response.status_code})</h1></body></html>"
+                )
+                page.security_challenge_detected = True
+                page.security_challenge_reason = f"Target host returned HTTP {e.response.status_code} Access Restricted (Anti-Bot / WAF Shield active)"
+                return page
             raise RuntimeError(f"HTTP {e.response.status_code} from {clean_url} — {e.response.reason_phrase}")
         except Exception as e:
             raise RuntimeError(f"Failed to load {clean_url}: {e}")
@@ -605,7 +645,7 @@ class BrowserAgent:
 
             ctx = await self._browser.new_context(
                 viewport={"width": 1280, "height": 900},
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AURA-Scanner/1.0"
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
             )
             render_page = await ctx.new_page()
             try:

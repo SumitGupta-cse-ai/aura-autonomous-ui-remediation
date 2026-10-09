@@ -465,6 +465,8 @@ class ScanData(BaseModel):
     screenshot: Optional[str] = None
     summary: Optional[ScanSummary] = None
     sandbox_url: Optional[str] = None
+    original_html: Optional[str] = None
+    patched_html: Optional[str] = None
     baseline: Optional[ScanBaseline] = None
     original_url: Optional[str] = None
     design_system: Optional[DesignSystem] = None

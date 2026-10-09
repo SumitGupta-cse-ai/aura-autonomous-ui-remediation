@@ -363,6 +363,9 @@ class Orchestrator:
                     else:
                         html_for_sandbox = f'<base href="{url}">\n' + html_for_sandbox
 
+                scan.original_html = html_for_sandbox
+                scan.patched_html = html_for_sandbox
+
                 for base_dir in [
                     Path(__file__).resolve().parent.parent / "demo-site",
                     Path(__file__).resolve().parent.parent.parent / "demo-site",
@@ -600,7 +603,7 @@ class Orchestrator:
                     target_fingerprints={i.id: (i.violation_fingerprint or "") for i in issues},
                     third_party_nodes=[],
                     iframe_inventory=[f for f in getattr(scan.website_document, "frames", [])],
-                    html_snapshot=html[:30000],
+                    html_snapshot=html_for_sandbox,
                     screenshot=screenshot,
                 )
                 scan.summary = self._compute_summary(issues, scan)
@@ -1009,6 +1012,8 @@ class Orchestrator:
             scan = self.get_scan(scan_id)
             if scan:
                 scan.sandbox_url = f"{base_url}/sandbox/{scan_id}"
+                if apply_result.get("patched_html"):
+                    scan.patched_html = apply_result.get("patched_html")
                 # Re-calculate remaining blocking issues
                 scan.blocking_issues = [i.id for i in scan.issues if i.is_blocking and i.status != IssueStatus.FIXED]
                 scan.blocking_issues_count = len(scan.blocking_issues)
@@ -1436,6 +1441,9 @@ class Orchestrator:
             if not apply_res.get("success"):
                 return {"success": False, "error": "Failed to apply bundle to sandbox"}
 
+            if apply_res.get("patched_html"):
+                scan.patched_html = apply_res.get("patched_html")
+
             # Mark all improvement issues in scan as FIXED
             for issue in scan.issues:
                 if issue.category == IssueCategory.IMPROVEMENT:
@@ -1503,6 +1511,8 @@ class Orchestrator:
                     (s_dir / "after.html").write_text(restored_html, encoding="utf-8")
                 except Exception:
                     pass
+
+            scan.patched_html = restored_html
 
             if self._active_page and self._active_scan_id == scan_id:
                 try:
