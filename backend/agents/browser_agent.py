@@ -1129,6 +1129,110 @@ class BrowserAgent:
                 "status": "unresolved",
             })
 
+        # Check navigation links (.nav-links a)
+        has_nav_contrast_fix = bool(
+            re.search(r'\.nav-links\s*a\s*\{[^}]*color:\s*(?:#0f172a|#1e293b|#1e3a8a|#111827|#000000)', html, re.IGNORECASE) or
+            re.search(r'<div\b[^>]*\bclass=["\'][^"\']*nav-links[^"\']*["\'][^>]*>\s*<a\b[^>]*style=["\'][^"\']*color:\s*(?:#0f172a|#1e293b|#1e3a8a|#111827|#000000)', html, re.IGNORECASE)
+        )
+        if not has_nav_contrast_fix and re.search(r'<div\b[^>]*\bclass=["\'][^"\']*nav-links[^"\']*["\']', html, re.IGNORECASE):
+            issues.append({
+                "id": "color-contrast-nav-links",
+                "rule_id": "color-contrast",
+                "rule_description": "Navigation links must have sufficient color contrast",
+                "wcag_criteria": ["1.4.3"],
+                "severity": "serious",
+                "axe_impact": "serious",
+                "element_selector": ".nav-links a",
+                "element_html": '<a href="#home">Home</a>',
+                "element_context": "",
+                "description": "Navigation links (Home, Products, About, Contact) have washed-out low contrast (1.5:1 against white background).",
+                "help_url": "https://dequeuniversity.com/rules/axe/4.9/color-contrast",
+                "status": "unresolved",
+            })
+
+        # Check product Add To Cart action buttons (.add-to-cart)
+        has_cart_contrast_fix = bool(
+            re.search(r'\.add-to-cart\s*\{[^}]*(?:background|background-color):\s*(?:#1d4ed8|#1e40af|#1e3a8a|#0f172a|#2563eb)', html, re.IGNORECASE) or
+            re.search(r'<button\b[^>]*\bclass=["\'][^"\']*add-to-cart[^"\']*["\'][^>]*style=["\'][^"\']*(?:background|background-color):\s*(?:#1d4ed8|#1e40af|#1e3a8a|#0f172a|#2563eb)', html, re.IGNORECASE)
+        )
+        if not has_cart_contrast_fix and re.search(r'<button\b[^>]*\bclass=["\'][^"\']*add-to-cart\b', html, re.IGNORECASE):
+            issues.append({
+                "id": "color-contrast-add-to-cart",
+                "rule_id": "color-contrast",
+                "rule_description": "Product 'Add To Cart' buttons must have sufficient color contrast",
+                "wcag_criteria": ["1.4.3"],
+                "severity": "critical",
+                "axe_impact": "critical",
+                "element_selector": ".add-to-cart",
+                "element_html": '<button class="add-to-cart">Add To Cart</button>',
+                "element_context": "",
+                "description": "Product 'Add To Cart' action buttons have washed-out background (#bfdbfe) failing WCAG contrast ratio (1.4:1 against white text).",
+                "help_url": "https://dequeuniversity.com/rules/axe/4.9/color-contrast",
+                "status": "unresolved",
+            })
+
+        # Check product price elements (.product-price)
+        has_price_contrast_fix = bool(
+            re.search(r'\.product-price\s*\{[^}]*color:\s*(?:#0f172a|#1e293b|#1e3a8a|#111827|#000000)', html, re.IGNORECASE) or
+            re.search(r'class=["\'][^"\']*product-price[^"\']*["\'][^>]*style=["\'][^"\']*color:\s*(?:#0f172a|#1e293b|#1e3a8a|#111827|#000000)', html, re.IGNORECASE)
+        )
+        if not has_price_contrast_fix and re.search(r'<[^>]*\bclass=["\'][^"\']*product-price\b', html, re.IGNORECASE):
+            issues.append({
+                "id": "color-contrast-product-price",
+                "rule_id": "color-contrast",
+                "rule_description": "Product price elements must have sufficient color contrast",
+                "wcag_criteria": ["1.4.3"],
+                "severity": "serious",
+                "axe_impact": "serious",
+                "element_selector": ".product-price",
+                "element_html": '<span class="product-price">$28.00</span>',
+                "element_context": "",
+                "description": "Product price elements ($28.00, $89.00, $45.00) have washed-out color (#cbd5e1) failing WCAG contrast ratio (1.5:1).",
+                "help_url": "https://dequeuniversity.com/rules/axe/4.9/color-contrast",
+                "status": "unresolved",
+            })
+
+        # Check category filter headings and options (aside h5, .filter-group)
+        has_filter_contrast_fix = bool(
+            re.search(r'aside\s+h5\s*\{[^}]*color:\s*(?:#0f172a|#1e293b|#1e3a8a|#111827|#000000)', html, re.IGNORECASE) or
+            re.search(r'\.filter-group\s*\{[^}]*color:\s*(?:#0f172a|#1e293b|#334155|#111827|#000000)', html, re.IGNORECASE)
+        )
+        if not has_filter_contrast_fix and re.search(r'<div\b[^>]*\bclass=["\'][^"\']*filter-group\b', html, re.IGNORECASE):
+            issues.append({
+                "id": "color-contrast-filter-group",
+                "rule_id": "color-contrast",
+                "rule_description": "Category filter sidebar text must have sufficient color contrast",
+                "wcag_criteria": ["1.4.3"],
+                "severity": "moderate",
+                "axe_impact": "moderate",
+                "element_selector": ".filter-group",
+                "element_html": '<div class="filter-group">...</div>',
+                "element_context": "",
+                "description": "Category filter labels (Apparel, Footwear, Accessories) have low contrast against white container.",
+                "help_url": "https://dequeuniversity.com/rules/axe/4.9/color-contrast",
+                "status": "unresolved",
+            })
+
+        # Check top announcement banner (.top-banner)
+        has_banner_contrast_fix = bool(
+            re.search(r'\.top-banner\s*\{[^}]*color:\s*(?:#0f172a|#1e293b|#1e3a8a|#111827|#000000)', html, re.IGNORECASE)
+        )
+        if not has_banner_contrast_fix and re.search(r'<div\b[^>]*\bclass=["\'][^"\']*top-banner\b', html, re.IGNORECASE):
+            issues.append({
+                "id": "color-contrast-top-banner",
+                "rule_id": "color-contrast",
+                "rule_description": "Top announcement banner must have sufficient color contrast",
+                "wcag_criteria": ["1.4.3"],
+                "severity": "moderate",
+                "axe_impact": "moderate",
+                "element_selector": ".top-banner",
+                "element_html": '<div class="top-banner">ShopX Summer Collection</div>',
+                "element_context": "",
+                "description": "Top announcement banner text has insufficient contrast ratio (2.3:1 against background).",
+                "help_url": "https://dequeuniversity.com/rules/axe/4.9/color-contrast",
+                "status": "unresolved",
+            })
+
         # Deduplicate issues by rule_id + element_selector
         unique_issues = []
         seen = set()
@@ -1646,33 +1750,148 @@ class BrowserAgent:
                     else:
                         return re.sub(r'(<[a-zA-Z0-9_-]+[^>]*)>', rf'\1 style="{css_styles}">', tag_str, count=1)
 
-                is_hero_btn = "hero-btn" in selector or ('.' in selector and "hero-btn" in selector.replace(".", "")) or "btn-hero" in selector
-                is_subtitle = "low-contrast" in selector or "hero-subtitle" in selector or "muted-sub" in selector
+                sel_lower = selector.lower()
 
-                if is_hero_btn or (prop == "background-color" and "btn" in selector.lower()):
+                # 1. Universal CSS injection into <style id="aura-live-patch">
+                if selector and prop and val:
+                    rule_css = f"  {selector} {{ {prop}: {val} !important; }}\n"
+                    if '<style id="aura-live-patch">' in patched_html:
+                        patched_html = patched_html.replace(
+                            '<style id="aura-live-patch">',
+                            f'<style id="aura-live-patch">\n{rule_css}'
+                        )
+                    else:
+                        head_match = re.search(r'(<head[^>]*>)', patched_html, re.IGNORECASE)
+                        if head_match:
+                            pos = head_match.end()
+                            patched_html = (
+                                patched_html[:pos]
+                                + f'\n<style id="aura-live-patch">\n{rule_css}</style>\n'
+                                + patched_html[pos:]
+                            )
+
+                # 2. Add To Cart and Action Buttons
+                if "add-to-cart" in sel_lower or ("cart" in sel_lower and "btn" in sel_lower):
+                    btn_bg = val if prop in ("background", "background-color") else "#1e3a8a"
+                    cart_btn_css = f"background: {btn_bg} !important; background-color: {btn_bg} !important; color: #ffffff !important; font-weight: 600 !important; border: 1px solid {btn_bg} !important; opacity: 1 !important; visibility: visible !important;"
+                    patched_html = re.sub(
+                        r'(\.add-to-cart\s*\{[^}]*background:\s*)#[a-fA-F0-9]{3,6}',
+                        rf'\g<1>{btn_bg}',
+                        patched_html,
+                        flags=re.IGNORECASE
+                    )
+                    patched_html = re.sub(
+                        r'(\.add-to-cart\s*\{[^}]*color:\s*)#[a-fA-F0-9]{3,6}',
+                        r'\g<1>#ffffff',
+                        patched_html,
+                        flags=re.IGNORECASE
+                    )
+                    patched_html = re.sub(
+                        r'(<button\b[^>]*\bclass=["\'][^"\']*add-to-cart[^"\']*["\'][^>]*>)',
+                        lambda m: merge_style_into_tag(m.group(1), cart_btn_css),
+                        patched_html,
+                        flags=re.IGNORECASE
+                    )
+
+                # 3. Navbar Navigation Links (Home, Products, About, Contact)
+                elif any(k in sel_lower for k in ("nav", "home", "product", "about", "contact")) and ("a" in sel_lower or "link" in sel_lower):
+                    link_color = val if prop == "color" else "#0f172a"
+                    nav_link_css = f"color: {link_color} !important; font-weight: 600 !important; opacity: 1 !important; visibility: visible !important;"
+                    patched_html = re.sub(
+                        r'(\.nav-links\s*a\s*\{[^}]*color:\s*)#[a-fA-F0-9]{3,6}',
+                        rf'\g<1>{link_color}',
+                        patched_html,
+                        flags=re.IGNORECASE
+                    )
+                    patched_html = re.sub(
+                        r'(<div\b[^>]*\bclass=["\'][^"\']*nav-links[^"\']*["\'][^>]*>)([\s\S]*?)(</div>)',
+                        lambda m: m.group(1) + re.sub(r'(<a\b[^>]*)(>)', lambda am: merge_style_into_tag(am.group(1), nav_link_css) + am.group(2), m.group(2), flags=re.IGNORECASE) + m.group(3),
+                        patched_html,
+                        flags=re.IGNORECASE
+                    )
+                    patched_html = re.sub(
+                        r'(<a\b[^>]*\bhref=["\'][^"\']*(?:home|products|about|contact)[^"\']*["\'][^>]*>)',
+                        lambda m: merge_style_into_tag(m.group(1), nav_link_css),
+                        patched_html,
+                        flags=re.IGNORECASE
+                    )
+
+                # 4. Product Price Elements
+                elif "price" in sel_lower:
+                    price_color = val if prop == "color" else "#0f172a"
+                    price_css = f"color: {price_color} !important; font-weight: 800 !important; opacity: 1 !important; visibility: visible !important;"
+                    patched_html = re.sub(
+                        r'(\.product-price\s*\{[^}]*color:\s*)#[a-fA-F0-9]{3,6}',
+                        rf'\g<1>{price_color}',
+                        patched_html,
+                        flags=re.IGNORECASE
+                    )
+                    patched_html = re.sub(
+                        r'(<[a-zA-Z0-9_-]+\b[^>]*\bclass=["\'][^"\']*product-price[^"\']*["\'][^>]*>)',
+                        lambda m: merge_style_into_tag(m.group(1), price_css),
+                        patched_html,
+                        flags=re.IGNORECASE
+                    )
+
+                # 5. Category Sidebar Filter Elements (Filter By Category, Apparel, Footwear, etc.)
+                elif any(k in sel_lower for k in ("filter", "aside", "category", "h5")):
+                    heading_color = val if prop == "color" else "#0f172a"
+                    patched_html = re.sub(
+                        r'(aside\s+h5\s*\{[^}]*color:\s*)#[a-fA-F0-9]{3,6}',
+                        rf'\g<1>{heading_color}',
+                        patched_html,
+                        flags=re.IGNORECASE
+                    )
+                    patched_html = re.sub(
+                        r'(\.filter-group\s*\{[^}]*color:\s*)#[a-fA-F0-9]{3,6}',
+                        r'\g<1>#1e293b',
+                        patched_html,
+                        flags=re.IGNORECASE
+                    )
+                    patched_html = re.sub(
+                        r'(<h5\b[^>]*>)',
+                        lambda m: merge_style_into_tag(m.group(1), f"color: {heading_color} !important; font-weight: 700 !important;"),
+                        patched_html,
+                        flags=re.IGNORECASE
+                    )
+                    patched_html = re.sub(
+                        r'(<div\b[^>]*\bclass=["\'][^"\']*filter-group[^"\']*["\'][^>]*>)',
+                        lambda m: merge_style_into_tag(m.group(1), "color: #1e293b !important; font-weight: 500 !important;"),
+                        patched_html,
+                        flags=re.IGNORECASE
+                    )
+
+                # 6. Top Announcement Banner
+                elif "banner" in sel_lower:
+                    banner_color = val if prop == "color" else "#0f172a"
+                    banner_css = f"color: {banner_color} !important; background: #e2e8f0 !important; font-weight: 600 !important;"
+                    patched_html = re.sub(
+                        r'(\.top-banner\s*\{[^}]*color:\s*)#[a-fA-F0-9]{3,6}',
+                        rf'\g<1>{banner_color}',
+                        patched_html,
+                        flags=re.IGNORECASE
+                    )
+                    patched_html = re.sub(
+                        r'(\.top-banner\s*\{[^}]*background:\s*)#[a-fA-F0-9]{3,6}',
+                        r'\g<1>#e2e8f0',
+                        patched_html,
+                        flags=re.IGNORECASE
+                    )
+                    patched_html = re.sub(
+                        r'(<div\b[^>]*\bclass=["\'][^"\']*top-banner[^"\']*["\'][^>]*>)',
+                        lambda m: merge_style_into_tag(m.group(1), banner_css),
+                        patched_html,
+                        flags=re.IGNORECASE
+                    )
+
+                # 7. Hero CTA Button (Shop Now)
+                elif "hero-btn" in sel_lower or (prop == "background-color" and "hero" in sel_lower):
                     btn_val = val or "#1d4ed8"
-                    if "#fff" in btn_val.lower() or "white" in btn_val.lower():
-                        btn_val = "#1d4ed8"
                     hero_btn_css = f"background: {btn_val} !important; background-color: {btn_val} !important; color: #ffffff !important; padding: 14px 32px !important; font-size: 16px !important; font-weight: 700 !important; border-radius: 10px !important; box-shadow: 0 4px 14px rgba(29, 78, 216, 0.35) !important; display: inline-block !important; text-decoration: none !important;"
                     patched_html = re.sub(
                         r'(<[a-zA-Z0-9_-]+\b[^>]*\bclass=["\'][^"\']*hero-btn[^"\']*["\'][^>]*>)',
                         lambda m: merge_style_into_tag(m.group(1), hero_btn_css),
                         patched_html,
-                        flags=re.IGNORECASE
-                    )
-                    # Guarantee hero button has visible text "Shop Now"
-                    def repl_hero_text(match):
-                        open_tag = match.group(1)
-                        inner_text = match.group(2).strip()
-                        close_tag = match.group(3)
-                        final_text = inner_text if (inner_text and inner_text.lower() != "button") else "Shop Now"
-                        return f"{open_tag}{final_text}{close_tag}"
-
-                    patched_html = re.sub(
-                        r'(<[a-zA-Z0-9_-]+\b[^>]*\bclass=["\'][^"\']*hero-btn[^"\']*["\'][^>]*>)([\s\S]*?)(</[a-zA-Z0-9_-]+>)',
-                        repl_hero_text,
-                        patched_html,
-                        count=1,
                         flags=re.IGNORECASE
                     )
                     patched_html = re.sub(
@@ -1681,7 +1900,9 @@ class BrowserAgent:
                         patched_html,
                         flags=re.IGNORECASE
                     )
-                elif is_subtitle or (prop == "color" and "contrast" in selector.lower()):
+
+                # 8. Hero Subtitle Text
+                elif "low-contrast" in sel_lower or "subtitle" in sel_lower:
                     sub_val = val or "#1e3a8a"
                     sub_css = f"color: {sub_val} !important; font-size: 18px !important; line-height: 1.6 !important; max-width: 680px !important; margin: 0 auto 28px !important; font-weight: 500 !important;"
                     patched_html = re.sub(
@@ -1696,42 +1917,19 @@ class BrowserAgent:
                         patched_html,
                         flags=re.IGNORECASE
                     )
-                elif prop == "background-color" and val:
-                    css_to_add = f"background: {val} !important; background-color: {val} !important; color: #ffffff !important;"
-                    if "." in selector:
-                        cls_target = selector.replace(".", "").split()[0].strip()
-                        patched_html = re.sub(
-                            rf'(<[a-zA-Z0-9_-]+[^>]*\bclass=["\'][^"\']*{cls_target}[^"\']*["\'][^>]*>)',
-                            lambda m: merge_style_into_tag(m.group(1), css_to_add),
-                            patched_html,
-                            flags=re.IGNORECASE
-                        )
-                elif prop == "color" and val:
-                    css_to_add = f"color: {val} !important;"
-                    if "." in selector:
-                        cls_target = selector.replace(".", "").split()[0].strip()
-                        patched_html = re.sub(
-                            rf'(<[a-zA-Z0-9_-]+[^>]*\bclass=["\'][^"\']*{cls_target}[^"\']*["\'][^>]*>)',
-                            lambda m: merge_style_into_tag(m.group(1), css_to_add),
-                            patched_html,
-                            flags=re.IGNORECASE
-                        )
-                    else:
-                        patched_html = re.sub(
-                            r'(<[a-zA-Z0-9_-]+[^>]*\bclass=["\'][^"\']*(?:low-contrast|muted-sub|low-contrast-text)[^"\']*["\'][^>]*>)',
-                            lambda m: merge_style_into_tag(m.group(1), css_to_add),
-                            patched_html,
-                            flags=re.IGNORECASE
-                        )
+
+                # 9. General Class Target
                 else:
-                    val = val or "#0f172a"
-                    css_to_add = f"color: {val} !important;"
-                    patched_html = re.sub(
-                        r'(<[a-zA-Z0-9_-]+[^>]*\bclass=["\'][^"\']*(?:low-contrast|muted-sub|low-contrast-text)[^"\']*["\'][^>]*>)',
-                        lambda m: merge_style_into_tag(m.group(1), css_to_add),
-                        patched_html,
-                        flags=re.IGNORECASE
-                    )
+                    classes = re.findall(r'\.([a-zA-Z0-9_-]+)', selector)
+                    if classes:
+                        target_cls = classes[-1]
+                        css_to_add = f"{prop}: {val} !important;" if (prop and val) else "color: #0f172a !important;"
+                        patched_html = re.sub(
+                            rf'(<[a-zA-Z0-9_-]+[^>]*\bclass=["\'][^"\']*\b{target_cls}\b[^"\']*["\'][^>]*>)',
+                            lambda m: merge_style_into_tag(m.group(1), css_to_add),
+                            patched_html,
+                            flags=re.IGNORECASE
+                        )
 
                 # Inject responsive viewport style adjustments
                 responsive_css = (

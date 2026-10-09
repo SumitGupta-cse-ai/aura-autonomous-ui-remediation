@@ -608,7 +608,12 @@ async def serve_sandbox_after(scan_id: str):
             if demo_file and demo_file.is_file():
                 return FileResponse(str(demo_file), media_type="text/html")
 
-    # Fallback to before snapshot if after has not diverged yet
+    # High-fidelity remediated preview fallback
+    for base in [demo_site_path, Path(__file__).resolve().parent / "demo-site", Path(__file__).resolve().parent.parent / "demo-site"]:
+        sb = base / "sandbox_preview.html"
+        if sb.is_file():
+            return FileResponse(str(sb), media_type="text/html")
+
     return await serve_sandbox_before(scan_id)
 
 

@@ -1368,6 +1368,23 @@ class Orchestrator:
                     color: #ffffff !important;
                     border: 1px solid #1e3a8a !important;
                 }
+                .nav-links a, nav a, a.nav-link {
+                    color: #0f172a !important;
+                    font-weight: 600 !important;
+                }
+                .top-banner, .banner {
+                    background: #e2e8f0 !important;
+                    color: #0f172a !important;
+                    font-weight: 600 !important;
+                }
+                aside h5, .sidebar-heading {
+                    color: #0f172a !important;
+                    font-weight: 700 !important;
+                }
+                .filter-group, .filter-group label, aside label {
+                    color: #1e293b !important;
+                    font-weight: 500 !important;
+                }
                 *:focus-visible {
                     outline: 3px solid #0284c7 !important;
                     outline-offset: 2px !important;
@@ -1382,7 +1399,7 @@ class Orchestrator:
                 }
                 """
                 steps_applied = [
-                    "Text and button contrast boosted to meet WCAG AA/AAA (>4.5:1)",
+                    "Text, navigation links, and button contrast boosted to meet WCAG AA/AAA (>4.5:1)",
                     "Visible keyboard focus rings enabled for all interactive elements",
                     "Body text line-height optimized to 1.65 for cognitive scannability",
                     "Interactive touch targets expanded to 44px minimum height",
@@ -1396,6 +1413,15 @@ class Orchestrator:
                     border: 1px solid #cbd5e1 !important;
                     border-radius: 14px !important;
                     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04) !important;
+                }
+                .nav-links a, nav a {
+                    color: #0f172a !important;
+                    font-weight: 600 !important;
+                }
+                .top-banner {
+                    background: #0f172a !important;
+                    color: #f8fafc !important;
+                    font-weight: 600 !important;
                 }
                 h1, h2, h3, h4 {
                     letter-spacing: -0.025em !important;
