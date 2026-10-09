@@ -71,8 +71,10 @@ class VerificationStatus(str, Enum):
     PENDING = "pending"
     VERIFIED = "verified"
     FAILED = "failed"
+    VERIFICATION_FAILED = "failed"  # alias to prevent runtime errors
     NEEDS_REVIEW = "needs_review"
     REGRESSION_DETECTED = "regression_detected"
+
 
 
 class TimelineEventType(str, Enum):

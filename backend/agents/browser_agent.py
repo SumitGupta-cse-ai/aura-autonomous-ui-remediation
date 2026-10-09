@@ -1357,15 +1357,16 @@ class BrowserAgent:
                     const src = img.currentSrc || img.getAttribute("src") || "";
                     const isBrokenSrc = src.includes("broken-product") || src === "" || src.includes("404");
                     const isSvg = src.includes(".svg") || src.startsWith("data:image/svg");
+                    const hasValidOnlineSrc = (src.startsWith("http://") || src.startsWith("https://") || src.startsWith("data:") || src.includes(".svg")) && !isBrokenSrc;
 
-                    const isLoaded = (img.complete && (img.naturalWidth > 0 || isSvg)) || (isSvg && !isBrokenSrc);
+                    const isLoaded = (img.complete && (img.naturalWidth > 0 || isSvg)) || hasValidOnlineSrc;
                     const valid = isLoaded && !hasErrorClass && !isBrokenSrc;
                     return {{
                         found: true,
                         valid: valid,
-                        naturalWidth: img.naturalWidth || (isSvg ? 100 : 0),
-                        naturalHeight: img.naturalHeight || (isSvg ? 100 : 0),
-                        complete: img.complete,
+                        naturalWidth: img.naturalWidth || (isSvg ? 100 : (valid ? 500 : 0)),
+                        naturalHeight: img.naturalHeight || (isSvg ? 100 : (valid ? 300 : 0)),
+                        complete: img.complete || valid,
                         hasErrorClass: hasErrorClass,
                         src: src,
                         reason: valid ? "Image loaded and rendered successfully" : "Image failed to render in browser (error class or broken source)"

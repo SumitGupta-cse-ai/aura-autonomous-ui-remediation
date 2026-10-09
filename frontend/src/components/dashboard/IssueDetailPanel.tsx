@@ -499,7 +499,7 @@ export function IssueDetailPanel({
                     ? "Source Repository Access Required"
                     : issue.status === "failed"
                     ? "Manual Review Required"
-                    : "Automated Fix Unavailable"}
+                    : "Automated Fix Advisory"}
                 </span>
               </div>
               <p className="text-xs text-[#94a3b8] leading-relaxed">
@@ -516,6 +516,18 @@ export function IssueDetailPanel({
                   {issue.fix_strategies_tried.join(", ")}
                 </div>
               )}
+              <button
+                onClick={() => onFix(issue.id)}
+                disabled={isFixing}
+                className="w-full mt-2 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+              >
+                {isFixing ? (
+                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <Wrench className="w-3.5 h-3.5" />
+                )}
+                <span>Auto Fix In Sandbox Anyway</span>
+              </button>
             </div>
           ) : (
             <button

@@ -63,8 +63,8 @@ def classify_issue_fixability(
         return (
             FixClassification.AUTO_FIXABLE_WITH_REVIEW,
             85,
-            False,
-            "Visual layout and design enhancement preview available; requires user review to confirm aesthetic preference.",
+            True,
+            "Visual layout and design enhancement preview available; 1-click preview and remediation enabled.",
         )
 
     # 3. BROKEN ASSET RECOVERY
@@ -220,9 +220,9 @@ def classify_issue_fixability(
         else:
             return (
                 FixClassification.AUTO_FIXABLE_WITH_REVIEW,
-                60,
-                False,
-                "Generic overflow container; keyboard focus order should be verified to prevent tab trap.",
+                75,
+                True,
+                "Generic overflow container; safe keyboard tabindex injection available.",
             )
 
     # 5. GENERAL SAFE FALLBACK

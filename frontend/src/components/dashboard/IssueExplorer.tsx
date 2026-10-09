@@ -356,41 +356,36 @@ export function IssueExplorer({
                   </span>
 
                   {issue.status !== "fixed" && (
-                    issue.is_retryable === false ? (
-                      <span
-                        className="px-2 py-0.5 rounded-lg border border-[#334155] bg-[#16202c] text-[#94a3b8] text-[10px] font-semibold"
-                        title={issue.non_retryable_reason || "Manual review required"}
-                      >
-                        Manual
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onFixIssue(issue.id);
+                      }}
+                      disabled={isFixing}
+                      title={issue.dependency_status === "BLOCKED" ? (issue.blocking_reason || "Blocked: fix baseline issues first") : (issue.non_retryable_reason || "Auto-fix this issue")}
+                      className={`px-2 py-0.5 rounded-lg border text-[11px] font-semibold transition-all flex items-center gap-1 disabled:opacity-50 cursor-pointer ${
+                        issue.dependency_status === "BLOCKED"
+                          ? "bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300"
+                          : issue.is_retryable === false
+                          ? "bg-[#16202c] border-[#334155] text-amber-400 hover:bg-[#1e2d3d]"
+                          : isImp
+                          ? "bg-purple-500/15 hover:bg-purple-500/25 border-purple-500/30 text-purple-300"
+                          : "bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-500/30 text-emerald-400"
+                      }`}
+                    >
+                      {isFixing ? (
+                        <div className="w-2.5 h-2.5 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />
+                      ) : issue.dependency_status === "BLOCKED" ? (
+                        <Lock className="w-2.5 h-2.5 text-amber-400" />
+                      ) : isImp ? (
+                        <Sparkles className="w-2.5 h-2.5 text-purple-400" />
+                      ) : (
+                        <Wrench className="w-2.5 h-2.5 text-emerald-400" />
+                      )}
+                      <span>
+                        {isFixing ? "Fixing..." : issue.status === "failed" ? "Retry" : isImp ? "Apply" : "Fix"}
                       </span>
-                    ) : (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onFixIssue(issue.id);
-                        }}
-                        disabled={isFixing}
-                        title={issue.dependency_status === "BLOCKED" ? (issue.blocking_reason || "Blocked: fix baseline issues first") : undefined}
-                        className={`px-2 py-0.5 rounded-lg border text-[11px] font-semibold transition-all flex items-center gap-1 disabled:opacity-50 cursor-pointer ${
-                          issue.dependency_status === "BLOCKED"
-                            ? "bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300"
-                            : isImp
-                            ? "bg-purple-500/15 hover:bg-purple-500/25 border-purple-500/30 text-purple-300"
-                            : "bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-500/30 text-emerald-400"
-                        }`}
-                      >
-                        {isFixing ? (
-                          <div className="w-2.5 h-2.5 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />
-                        ) : issue.dependency_status === "BLOCKED" ? (
-                          <Lock className="w-2.5 h-2.5 text-amber-400" />
-                        ) : isImp ? (
-                          <Sparkles className="w-2.5 h-2.5 text-purple-400" />
-                        ) : (
-                          <Wrench className="w-2.5 h-2.5" />
-                        )}
-                        <span>{issue.status === "failed" ? "Retry" : isImp ? "Apply" : "Fix"}</span>
-                      </button>
-                    )
+                    </button>
                   )}
 
                   <ChevronRight className="w-3.5 h-3.5 text-[#64748b]" />

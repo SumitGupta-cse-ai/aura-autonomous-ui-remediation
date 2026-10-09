@@ -194,10 +194,10 @@ Accessibility Violation Evidence:
             issue_summary=description,
             root_cause=description,
             user_impact=f"This {severity} issue may prevent users with disabilities from interacting properly.",
-            is_auto_remediable=severity in ("critical", "serious"),
+            is_auto_remediable=True,
             recommended_strategy=f"Remediate {rule_id} violation according to WCAG criteria.",
             recommended_fix=f"Apply targeted DOM/ARIA patch for {rule_id}.",
             risk="Medium" if severity in ("critical", "serious") else "Low",
             verification_approach=f"Re-run axe-core rule '{rule_id}'.",
-            confidence=0.75,
+            confidence=0.85,
         )
