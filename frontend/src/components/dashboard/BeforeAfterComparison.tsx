@@ -361,7 +361,7 @@ export function BeforeAfterComparison({
       {/* Primary Action Buttons & Version Switcher Bar */}
       <div className="px-4 py-2.5 bg-[#0b131e] border-b border-[#1e293b] flex flex-wrap items-center justify-between gap-2.5 flex-shrink-0">
         {/* Left: Primary 3 Action Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* [ Original Website ] */}
           <a
             href={scanId ? getSandboxBeforeUrl(scanId) : (canonicalOriginalUrl || "#")}
@@ -415,7 +415,7 @@ export function BeforeAfterComparison({
         </div>
 
         {/* Right: Version Switcher */}
-        <div className="flex items-center gap-1 bg-[#16202c] p-1 rounded-lg border border-[#1e293b]">
+        <div className="flex items-center gap-1 bg-[#16202c] p-1 rounded-lg border border-[#1e293b] flex-wrap">
           <span className="text-[10px] text-[#64748b] uppercase tracking-wider font-bold px-1.5">Version:</span>
           <button
             onClick={() => {

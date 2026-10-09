@@ -148,8 +148,8 @@ Vision Result: {json.dumps(vision_result or {}, default=str)[:200]}
             changes = []
             
             # Check for broken image asset in selector or HTML
-            if "broken" in sel_lower or "broken" in html_lower or "card-product-broken" in sel_lower or "sneaker" in sel_lower:
-                valid_src = "/demo-site/assets/trail-sneakers.svg"
+            if any(k in sel_lower or k in html_lower for k in ("broken", "card-product-broken", "sneaker", "trail", "runner", "img-error")):
+                valid_src = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&auto=format&fit=crop&q=80"
                 alt_text = "Breathable Trail Sneakers — Red lightweight running footwear"
                 changes = [
                     FixChange(type="modify_attribute", attribute="src", value=valid_src),

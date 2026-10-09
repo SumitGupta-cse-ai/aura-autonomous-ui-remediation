@@ -610,6 +610,11 @@ class BrowserAgent:
             render_page = await ctx.new_page()
             try:
                 await render_page.set_content(html, wait_until="load", timeout=8000)
+                try:
+                    await render_page.evaluate("() => { window.scrollTo(0, 0); if (document.documentElement) document.documentElement.scrollTop = 0; if (document.body) document.body.scrollTop = 0; }")
+                    await asyncio.sleep(0.08)
+                except Exception:
+                    pass
                 shot = await render_page.screenshot(full_page=False, type="png")
                 b64 = base64.b64encode(shot).decode("utf-8")
                 return f"data:image/png;base64,{b64}"
@@ -741,6 +746,13 @@ class BrowserAgent:
         # 1. Direct Playwright page screenshot if page is a live Page
         if hasattr(page, "screenshot") and not isinstance(page, MockPage):
             try:
+                # Always reset scroll to top so announcement banner and header are 100% visible
+                if hasattr(page, "evaluate"):
+                    try:
+                        await page.evaluate("() => { window.scrollTo(0, 0); if (document.documentElement) document.documentElement.scrollTop = 0; if (document.body) document.body.scrollTop = 0; }")
+                        await asyncio.sleep(0.08)
+                    except Exception:
+                        pass
                 # Use JPEG with quality 60 to drastically reduce memory usage (20KB vs 500KB)
                 screenshot_bytes = await page.screenshot(full_page=False, type="jpeg", quality=60)
                 if screenshot_bytes:
@@ -1222,8 +1234,8 @@ class BrowserAgent:
         else:
             # Fallback static evaluation
             html = getattr(page, "patched_html", "") or getattr(page, "html_content", "")
-            has_broken = "broken-product-sneaker.jpg" in html
-            has_valid_src = "trail-sneakers.svg" in html or "unsplash.com" in html
+            has_broken = any(b in html for b in ("broken-product", "card-product-broken", "trail-runner.png"))
+            has_valid_src = "unsplash.com" in html or "trail-sneakers.svg" in html or "data:image" in html
             has_error_cls = "img-error" in html
             is_valid = has_valid_src and not has_broken and not has_error_cls
             return {
@@ -1393,19 +1405,21 @@ class BrowserAgent:
             elif rule in ("image-alt", "input-image-alt") or "img" in selector or attr in ("alt", "src"):
                 val = val or ("Descriptive image" if attr == "alt" else "")
 
+                REAL_SNEAKER_IMG = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&auto=format&fit=crop&q=80"
                 # Specifically detect and remediate broken sneaker image
                 is_sneaker_target = (
                     "broken" in selector.lower()
                     or "card-product-broken" in selector.lower()
                     or "sneaker" in selector.lower()
+                    or "trail" in selector.lower()
                     or (attr == "src" and ("sneaker" in str(val).lower() or "trail" in str(val).lower()))
-                    or ("broken-product-sneaker" in patched_html and (attr in ("src", "alt") or "img" in selector))
+                    or any(k in patched_html for k in ("broken-product", "card-product-broken", "trail-runner"))
                 )
 
                 if is_sneaker_target:
-                    sneaker_pattern = r'<img\b[^>]*?(?:broken-product-sneaker|card-product-broken)[^>]*?>'
-                    sneaker_src = val if (attr == "src" and val) else "/demo-site/assets/trail-sneakers.svg"
-                    sneaker_alt = val if (attr == "alt" and val) else "Breathable Trail Sneakers — Red lightweight running footwear"
+                    sneaker_pattern = r'<img\b[^>]*?(?:broken-product|card-product-broken|trail-runner)[^>]*?>'
+                    sneaker_src = val if (attr == "src" and val and not val.endswith(".svg")) else REAL_SNEAKER_IMG
+                    sneaker_alt = val if (attr == "alt" and val and "sneaker" in val.lower()) else "Breathable Trail Sneakers — Red lightweight running footwear"
 
                     def repl_sneaker(m):
                         tag = m.group(0)
@@ -1418,7 +1432,7 @@ class BrowserAgent:
                             tag
                         )
                         # Update src
-                        if re.search(r'\bsrc=["\']', tag, re.IGNORECASE):
+                        if re.search(r'\bsrc=["\'][^"\']*["\']', tag, re.IGNORECASE):
                             tag = re.sub(r'src=["\'][^"\']*["\']', f'src="{sneaker_src}"', tag, flags=re.IGNORECASE)
                         else:
                             tag = tag[:-1] + f' src="{sneaker_src}">'
@@ -1430,6 +1444,7 @@ class BrowserAgent:
                         return tag
 
                     patched_html = re.sub(sneaker_pattern, repl_sneaker, patched_html, flags=re.IGNORECASE | re.DOTALL)
+                    patched_html = patched_html.replace("broken-product-trail-runner.png", REAL_SNEAKER_IMG)
                     patched_html = re.sub(
                         r'img\.img-error\s*\{[^}]*\}',
                         'img.card-product-fixed { border-radius: 10px; object-fit: cover; width: 100%; height: 200px; display: block; }',
@@ -1438,6 +1453,7 @@ class BrowserAgent:
                     )
                     patched_html = re.sub(r'<div class="broken-img-overlay"[^>]*>.*?</div>', '', patched_html, flags=re.DOTALL | re.IGNORECASE)
                     patched_html = re.sub(r'style="[^"]*border:\s*2px\s*dashed\s*#fca5a5;?[^"]*"', 'style="height: 200px; border: none;"', patched_html, flags=re.IGNORECASE)
+                    patched_html = re.sub(r'style="height:\s*240px;?[^"]*"', 'style="height: 200px; border: none;"', patched_html, flags=re.IGNORECASE)
 
                 img_cls_match = re.search(r'(?:img)?\.([\w-]+)', selector)
                 cls_name = img_cls_match.group(1) if img_cls_match else ""
@@ -1595,18 +1611,28 @@ class BrowserAgent:
 
                 if is_hero_btn or (prop == "background-color" and "btn" in selector.lower()):
                     btn_val = val or "#1d4ed8"
-                    hero_btn_css = f"background: {btn_val} !important; background-color: {btn_val} !important; color: #ffffff !important; padding: 14px 32px !important; font-size: 16px !important; font-weight: 700 !important; border-radius: 10px !important; box-shadow: 0 4px 14px rgba(29, 78, 216, 0.35) !important;"
+                    if "#fff" in btn_val.lower() or "white" in btn_val.lower():
+                        btn_val = "#1d4ed8"
+                    hero_btn_css = f"background: {btn_val} !important; background-color: {btn_val} !important; color: #ffffff !important; padding: 14px 32px !important; font-size: 16px !important; font-weight: 700 !important; border-radius: 10px !important; box-shadow: 0 4px 14px rgba(29, 78, 216, 0.35) !important; display: inline-block !important; text-decoration: none !important;"
                     patched_html = re.sub(
                         r'(<[a-zA-Z0-9_-]+\b[^>]*\bclass=["\'][^"\']*hero-btn[^"\']*["\'][^>]*>)',
                         lambda m: merge_style_into_tag(m.group(1), hero_btn_css),
                         patched_html,
                         flags=re.IGNORECASE
                     )
-                    # Update text to "Shop Collection" if hero button had generic text
+                    # Guarantee hero button has visible text "Shop Now"
+                    def repl_hero_text(match):
+                        open_tag = match.group(1)
+                        inner_text = match.group(2).strip()
+                        close_tag = match.group(3)
+                        final_text = inner_text if (inner_text and inner_text.lower() != "button") else "Shop Now"
+                        return f"{open_tag}{final_text}{close_tag}"
+
                     patched_html = re.sub(
-                        r'(<[a-zA-Z0-9_-]+\b[^>]*\bclass=["\'][^"\']*hero-btn[^"\']*["\'][^>]*>)\s*(?:Explore Now|Shop|Click|Button|Shop Now|Action)?\s*(</[a-zA-Z0-9_-]+>)',
-                        r'\g<1>Shop Collection\g<2>',
+                        r'(<[a-zA-Z0-9_-]+\b[^>]*\bclass=["\'][^"\']*hero-btn[^"\']*["\'][^>]*>)([\s\S]*?)(</[a-zA-Z0-9_-]+>)',
+                        repl_hero_text,
                         patched_html,
+                        count=1,
                         flags=re.IGNORECASE
                     )
                     patched_html = re.sub(

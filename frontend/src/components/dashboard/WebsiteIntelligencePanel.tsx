@@ -307,7 +307,7 @@ export function WebsiteIntelligencePanel({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {onAskAura && (
             <button
               onClick={onAskAura}
@@ -319,7 +319,7 @@ export function WebsiteIntelligencePanel({
           )}
 
           {/* Sub-tabs */}
-          <div className="flex items-center bg-[#16202c] border border-[#1e293b] rounded-lg p-0.5 text-xs">
+          <div className="flex items-center bg-[#16202c] border border-[#1e293b] rounded-lg p-0.5 text-xs overflow-x-auto max-w-full">
             <button
               onClick={() => setActiveTab("advisor")}
               className={`px-3 py-1 rounded-md transition-all font-medium flex items-center gap-1.5 ${

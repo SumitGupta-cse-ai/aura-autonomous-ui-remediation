@@ -149,7 +149,9 @@ def _compile_change(change, strategy: str):
         patch.append(f"el.removeAttribute({safe_attr});")
 
     elif strategy in ("set_text_content", "modify_text"):
-        text = change.text or change.value or ""
+        text = (change.text or change.value or "").strip()
+        if not text:
+            return None
         safe_text = json.dumps(text)
         rollback.append(f"const origText = el.textContent;")
         rollback.append(f"el.textContent = origText;")
