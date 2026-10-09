@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <!-- meta-viewport violation: user-scalable=no, maximum-scale=1 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Universal Test Page — AURA Remediation Engine</title>
+    <style>
+        body { font-family: sans-serif; background: #ffffff; color: #111827; padding: 20px; }
+        /* color-contrast violation: #9ca3af on #ffffff ratio is ~2.8:1 */
+        .low-contrast-text { color: #9ca3af; background-color: #ffffff; font-size: 14px; }
+        .low-contrast-btn { color: #86efac; background-color: #22c55e; border: none; padding: 10px 20px; }
+    </style>
+</head>
+<body>
+    <!-- landmark-unique violation: multiple navs without distinct labels -->
+    <nav>
+        <a href="/">Home</a>
+        <!-- link-name violation: empty anchor -->
+        <a href="/cart" class="cart-link"><span></span></a>
+    </nav>
+    <nav>
+        <a href="/docs">Docs</a>
+        <a href="/faq">FAQ</a>
+    </nav>
+
+    <main>
+        <h2>Heading level 2 without preceding H1</h2>
+        
+        <!-- image-alt violation -->
+        <img src="/demo-site/assets/trail-sneakers.svg" id="hero-img">
+
+        <!-- image-redundant-alt violation: image inside link with same text as link text -->
+        <a href="/products/sneakers">
+            <img src="/demo-site/assets/trail-sneakers.svg" alt="Sneakers">
+            Sneakers
+        </a>
+
+        <!-- label-title-only violation: input with title but no label/aria-label -->
+        <form>
+            <input type="text" name="query" title="Search our catalog" placeholder="Search...">
+        </form>
+
+        <p class="low-contrast-text">This paragraph has insufficient color contrast against its white background.</p>
+        <button class="low-contrast-btn">Low Contrast Button</button>
+    </main>
+
+    <!-- landmark-no-duplicate-contentinfo violation: two footer contentinfo elements -->
+    <footer role="contentinfo" id="primary-footer">
+        <p>&copy; 2026 Test Site</p>
+    </footer>
+    <footer role="contentinfo" id="secondary-footer">
+        <p>Secondary disclaimer footer</p>
+    </footer>
+</body>
+</html>

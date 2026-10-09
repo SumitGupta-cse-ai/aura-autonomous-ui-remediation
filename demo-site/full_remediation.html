@@ -6,157 +6,485 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ShopX — Summer Collection | Modern E-Commerce Store</title>
     <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --secondary: #3b82f6;
+            --accent: #10b981;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --radius: 12px;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.08);
+        }
+
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #0f172a; line-height: 1.5; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
         *:focus { outline: none; } /* INTENTIONAL: Missing focus outline (WCAG 2.4.7) */
 
         /* Top Announcement Banner */
-        .top-banner { background: #2563eb; color: #ffffff; text-align: center; padding: 8px 16px; font-size: 13px; font-weight: 600; }
+        .top-banner { background: #1e3a8a; color: #ffffff; text-align: center; padding: 10px 16px; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 12px; }
+        .top-banner .badge { background: #ef4444; color: #ffffff; padding: 2px 8px; border-radius: 999px; font-size: 11px; text-transform: uppercase; font-weight: 800; letter-spacing: 0.5px; }
+        .countdown { font-family: monospace; font-size: 12px; opacity: 0.9; background: rgba(0,0,0,0.25); padding: 2px 8px; border-radius: 4px; }
 
         /* Navbar */
-        nav { background: #ffffff; border-bottom: 1px solid #e2e8f0; padding: 16px 40px; display: flex; align-items: center; justify-content: space-between; }
-        .logo { font-size: 22px; font-weight: 800; color: #1e293b; letter-spacing: -0.5px; }
-        .logo span { color: #2563eb; }
+        nav { background: #ffffff; border-bottom: 1px solid var(--border); padding: 16px 48px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 40; box-shadow: var(--shadow-sm); }
+        .logo { font-size: 24px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; text-decoration: none; }
+        .logo span { color: var(--primary); }
         
-        .nav-links { display: flex; gap: 24px; align-items: center; }
-        .nav-links a { text-decoration: none; color: #475569; font-size: 14px; font-weight: 500; }
+        .nav-links { display: flex; gap: 28px; align-items: center; }
+        .nav-links a { text-decoration: none; color: #334155; font-size: 14px; font-weight: 600; transition: color 0.15s; }
+        .nav-links a:hover { color: var(--primary); }
 
-        .search-box { flex: 0.4; max-width: 380px; position: relative; }
+        .nav-actions { display: flex; align-items: center; gap: 12px; flex: 0.45; justify-content: flex-end; }
+        .search-box { flex: 1; max-width: 320px; position: relative; }
         /* INTENTIONAL: Search input missing label (WCAG 1.3.1 / 4.1.2) */
-        .search-input { width: 100%; padding: 8px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; background: #ffffff; color: #0f172a; }
+        .search-input { width: 100%; padding: 9px 16px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; background: #ffffff; color: var(--text); }
 
-        .cart-action-btn { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 8px; cursor: pointer; color: #475569; }
+        /* INTENTIONAL: Icon buttons missing aria-label (WCAG 4.1.2) */
+        .action-icon-btn { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 8px; cursor: pointer; color: #475569; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+        .action-icon-btn:hover { background: #e2e8f0; color: #0f172a; }
 
         /* Hero Section */
-        .hero { background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-bottom: 1px solid #bfdbfe; padding: 56px 40px; text-align: center; }
-        .hero h1 { font-size: 42px; font-weight: 800; color: #1e3a8a; margin-bottom: 8px; letter-spacing: -1px; }
-        /* INTENTIONAL: Low contrast text (WCAG 1.4.3) */
-        .low-contrast-text { color: #93c5fd; font-size: 15px; max-width: 600px; margin: 0 auto; font-weight: 500; }
-        .hero-btn { display: inline-block; background: #2563eb; color: #ffffff; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; text-decoration: none; margin-top: 20px; }
+        .hero { background: linear-gradient(135deg, #eff6ff 0%, #e0e7ff 50%, #f1f5f9 100%); border-bottom: 1px solid #c7d2fe; padding: 72px 48px; text-align: center; }
+        .hero-tag { display: inline-block; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #3b82f6; background: #dbeafe; padding: 4px 14px; border-radius: 999px; margin-bottom: 16px; }
+        .hero h1 { font-size: 48px; font-weight: 800; color: #1e3a8a; margin-bottom: 12px; letter-spacing: -1.2px; line-height: 1.15; }
+        /* INTENTIONAL: Low contrast text (WCAG 1.4.3: ratio 2.6:1 against #eff6ff) */
+        .low-contrast-text { font-size: 16px; color: #94a3b8; max-width: 620px; margin: 0 auto 24px; font-weight: 400; }
+        
+        .hero-actions { display: flex; align-items: center; justify-content: center; gap: 14px; }
+        /* INTENTIONAL: Low contrast on Hero CTA Shop Now button (WCAG 1.4.3: #60a5fa on #ffffff = 2.8:1 FAIL) */
+        .hero-btn { display: inline-block; background: #60a5fa; color: #ffffff; padding: 12px 24px; border-radius: 8px; font-weight: 700; font-size: 14px; text-decoration: none; transition: all 0.2s; box-shadow: 0 4px 12px rgba(96,165,250,0.3); }
+        .hero-btn-secondary { display: inline-block; background: #ffffff; color: #1e293b; border: 1px solid #cbd5e1; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px; text-decoration: none; transition: all 0.2s; }
 
-        /* Layout Grid */
-        .store-layout { max-width: 1280px; margin: 40px auto; padding: 0 24px; display: grid; grid-template-columns: 240px 1fr; gap: 32px; }
+        /* Categories Section */
+        .categories-section { max-width: 1280px; margin: 48px auto 0; padding: 0 24px; }
+        .section-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 24px; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; }
+        .section-title { font-size: 24px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; }
+        .section-subtitle { font-size: 13px; color: #64748b; margin-top: 4px; }
+        .categories-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+        .category-card { background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-align: center; text-decoration: none; color: inherit; transition: all 0.2s; box-shadow: var(--shadow-sm); }
+        .category-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--primary); }
+        .category-icon { width: 48px; height: 48px; border-radius: 12px; background: #eff6ff; color: var(--primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; }
+        .category-name { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+        .category-count { font-size: 12px; color: #64748b; }
+
+        /* Main Store Layout Grid */
+        .store-layout { max-width: 1280px; margin: 48px auto; padding: 0 24px; display: grid; grid-template-columns: 240px 1fr; gap: 32px; }
 
         /* Sidebar Filters */
-        aside { background: #ffffff; padding: 24px; border-radius: 12px; border: 1px solid #e2e8f0; height: max-content; }
-        /* INTENTIONAL: Heading order skip (h1 -> h5) (WCAG 1.3.1) */
-        aside h5 { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 14px; }
+        aside { background: #ffffff; padding: 24px; border-radius: var(--radius); border: 1px solid var(--border); height: max-content; box-shadow: var(--shadow-sm); }
+        /* INTENTIONAL: Heading skip h1 -> h5 (WCAG 1.3.1) */
+        aside h5 { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
         .filter-group { display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: #475569; }
+        .filter-group label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .filter-divider { height: 1px; background: #e2e8f0; margin: 18px 0; }
 
         /* Products Grid */
         .products-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
-        .product-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
-        .product-img-wrapper { height: 200px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; }
+        .product-card { background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; transition: all 0.2s; box-shadow: var(--shadow-sm); }
+        .product-card:hover { box-shadow: var(--shadow-md); border-color: #cbd5e1; }
+        .product-img-wrapper { height: 210px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
         .product-img-wrapper img { width: 100%; height: 100%; object-fit: cover; }
-        .product-body { padding: 20px; display: flex; flex-direction: column; flex: 1; }
-        .product-title { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 6px; }
-        .product-price { font-size: 18px; font-weight: 800; color: #2563eb; margin-top: auto; padding-top: 12px; }
-        .add-to-cart { background: #2563eb; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 12px; }
+        .discount-pill { position: absolute; top: 12px; left: 12px; background: #ef4444; color: #ffffff; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; }
+        .wishlist-pill { position: absolute; top: 12px; right: 12px; background: rgba(255,255,255,0.85); backdrop-blur: 4px; border: none; border-radius: 999px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #64748b; }
+        
+        /* Broken image indicator styling */
+        img.img-error { min-height: 210px; background: #fee2e2; border: 2px dashed #ef4444; color: #b91c1c; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+
+        .product-body { padding: 18px; display: flex; flex-direction: column; flex: 1; }
+        .product-rating { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #f59e0b; margin-bottom: 6px; }
+        .product-rating span { color: #64748b; margin-left: 4px; }
+        .product-title { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 8px; line-height: 1.3; }
+        .product-price-row { display: flex; align-items: baseline; gap: 8px; margin-top: auto; padding-top: 10px; }
+        /* INTENTIONAL: Low contrast price microcopy */
+        .product-price { font-size: 18px; font-weight: 800; color: #2563eb; }
+        .product-old-price { font-size: 13px; color: #94a3b8; text-decoration: line-through; }
+        .add-to-cart { background: var(--primary); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 12px; transition: background 0.15s; }
+        .add-to-cart:hover { background: var(--primary-hover); }
+
+        /* Featured Spotlight / Details Section */
+        .spotlight-section { max-width: 1280px; margin: 48px auto; padding: 0 24px; }
+        .spotlight-card { background: #ffffff; border: 1px solid var(--border); border-radius: 16px; padding: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; box-shadow: var(--shadow-sm); }
+        .spotlight-img { width: 100%; height: 360px; border-radius: 12px; object-fit: cover; }
+        .spotlight-body h3 { font-size: 28px; font-weight: 800; color: #0f172a; margin-bottom: 12px; }
+        .spotlight-body p { font-size: 14px; color: #475569; margin-bottom: 20px; line-height: 1.6; }
+        .size-selector { display: flex; gap: 8px; margin-bottom: 24px; }
+        .size-btn { border: 1px solid #cbd5e1; background: #ffffff; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .size-btn.active { border-color: var(--primary); background: #eff6ff; color: var(--primary); }
+
+        /* Customer Reviews */
+        .reviews-section { max-width: 1280px; margin: 48px auto; padding: 0 24px; }
+        .reviews-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+        .review-card { background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow-sm); }
+        .review-stars { color: #f59e0b; margin-bottom: 8px; font-size: 14px; }
+        .review-text { font-size: 13px; color: #334155; line-height: 1.6; margin-bottom: 14px; font-style: italic; }
+        .review-author { display: flex; align-items: center; gap: 10px; }
+        .review-author-name { font-size: 13px; font-weight: 700; color: #0f172a; }
+        .review-verified { font-size: 11px; color: #10b981; font-weight: 600; }
 
         /* Newsletter Section */
-        .newsletter { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 40px; margin-top: 48px; text-align: center; }
-        .newsletter h3 { font-size: 22px; font-weight: 700; color: #0f172a; margin-bottom: 8px; }
-        .newsletter-form { display: flex; gap: 12px; max-width: 440px; margin: 20px auto 0; }
-        /* INTENTIONAL: Newsletter input missing label */
-        .newsletter-input { flex: 1; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; }
-        .newsletter-btn { background: #0f172a; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        .newsletter { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: #ffffff; border-radius: 16px; padding: 48px 24px; margin: 64px auto; max-width: 1280px; text-align: center; }
+        .newsletter h3 { font-size: 26px; font-weight: 800; color: #ffffff; margin-bottom: 8px; }
+        .newsletter p { font-size: 14px; color: #94a3b8; max-width: 500px; margin: 0 auto; }
+        .newsletter-form { display: flex; gap: 12px; max-width: 460px; margin: 24px auto 0; }
+        /* INTENTIONAL: Newsletter input missing label (WCAG 1.3.1) */
+        .newsletter-input { flex: 1; padding: 12px 16px; border: 1px solid #334155; border-radius: 8px; font-size: 13px; background: #1e293b; color: #ffffff; }
+        .newsletter-btn { background: var(--primary); color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: background 0.15s; }
+        .newsletter-btn:hover { background: var(--primary-hover); }
 
         /* Footer */
-        footer { background: #0f172a; color: #94a3b8; padding: 40px 24px; text-align: center; margin-top: 64px; font-size: 13px; }
-        footer a { color: #38bdf8; text-decoration: none; margin-top: 12px; display: inline-block; }
+        footer { background: #0f172a; color: #94a3b8; padding: 56px 24px 24px; margin-top: 64px; font-size: 13px; border-top: 1px solid #1e293b; }
+        .footer-grid { max-width: 1280px; margin: 0 auto; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 40px; margin-bottom: 40px; text-align: left; }
+        .footer-brand h4 { font-size: 20px; font-weight: 800; color: #ffffff; margin-bottom: 12px; }
+        .footer-brand p { font-size: 13px; color: #64748b; line-height: 1.6; }
+        .footer-col h5 { font-size: 14px; font-weight: 700; color: #ffffff; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+        .footer-col a { color: #94a3b8; text-decoration: none; transition: color 0.15s; }
+        .footer-col a:hover { color: #ffffff; }
+        .footer-bottom { border-top: 1px solid #1e293b; padding-top: 24px; display: flex; align-items: center; justify-content: space-between; max-width: 1280px; margin: 0 auto; }
+        .social-links { display: flex; gap: 12px; }
+        /* INTENTIONAL: Link wrapping SVG icon without text or aria-label (WCAG 4.1.2) */
+        .social-link { width: 36px; height: 36px; border-radius: 8px; background: #1e293b; display: flex; align-items: center; justify-content: center; color: #38bdf8; text-decoration: none; transition: background 0.15s; }
+        .social-link:hover { background: #334155; }
     </style>
 </head>
 <body>
+    <!-- Top Announcement Banner -->
     <div class="top-banner">
-        🔥 ShopX Summer Collection — 20% Off All Orders With Code SUMMER20
+        <span class="badge">Summer Sale</span>
+        <span>20% Off All Outdoor &amp; Apparel with Code <strong>SUMMER20</strong></span>
+        <span class="countdown">⚡ Ends in 03h : 42m : 18s</span>
     </div>
 
+    <!-- Navigation Header -->
     <nav>
-        <span class="logo">SHOP<span>X</span></span>
+        <a href="#home" class="logo">SHOP<span>X</span></a>
         
         <div class="nav-links">
             <a href="#home">Home</a>
             <a href="#products">Products</a>
-            <a href="#about">About</a>
+            <a href="#categories">Categories</a>
+            <a href="#spotlight">Spotlight</a>
+            <a href="#reviews">Reviews</a>
             <a href="#contact">Contact</a>
         </div>
 
-        <div class="search-box">
-            <!-- INTENTIONAL: Search input without label (WCAG 1.3.1) -->
-            <input type="text" class="search-input" placeholder="Search products...">
-        </div>
+        <div class="nav-actions">
+            <div class="search-box">
+                <!-- INTENTIONAL: Search input without label (WCAG 1.3.1) -->
+                <input type="text" class="search-input" placeholder="Search summer collection...">
+            </div>
 
-        <!-- INTENTIONAL: Cart button without aria-label (WCAG 4.1.2) -->
-        <button class="cart-action-btn">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"></path>
-                <line x1="3" y1="6" x2="21" y2="6"></line>
-                <path d="M16 10a4 4 0 01-8 0"></path>
-            </svg>
-        </button>
+            <!-- INTENTIONAL: Wishlist button without aria-label (WCAG 4.1.2) -->
+            <button class="action-icon-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                </svg>
+            </button>
+
+            <!-- INTENTIONAL: Cart button without aria-label (WCAG 4.1.2) -->
+            <button class="action-icon-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"></path>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <path d="M16 10a4 4 0 01-8 0"></path>
+                </svg>
+            </button>
+        </div>
     </nav>
 
-    <div class="hero">
+    <!-- Hero Banner -->
+    <div class="hero" id="home">
+        <span class="hero-tag">New Arrivals 2026</span>
         <h1>Summer Collection</h1>
-        <!-- INTENTIONAL: Low contrast text (WCAG 1.4.3) -->
+        <!-- INTENTIONAL: Low contrast text (WCAG 1.4.3: ratio 2.6:1 against #eff6ff) -->
         <p class="low-contrast-text">Discover lightweight apparel and outdoor gear engineered for summer adventures.</p>
-        <a href="#products" class="hero-btn">Shop Now</a>
+        <div class="hero-actions">
+            <!-- INTENTIONAL: Low contrast on Hero CTA Shop Now button (WCAG 1.4.3: #60a5fa on #ffffff = 2.8:1 FAIL) -->
+            <a href="#products" class="hero-btn">Shop Now</a>
+            <a href="#categories" class="hero-btn-secondary">Explore Collection</a>
+        </div>
     </div>
 
+    <!-- Categories Section -->
+    <section class="categories-section" id="categories">
+        <div class="section-header">
+            <div>
+                <h2 class="section-title">Shop by Category</h2>
+                <p class="section-subtitle">Curated essentials tailored for active lifestyles</p>
+            </div>
+        </div>
+        <div class="categories-grid">
+            <a href="#products" class="category-card">
+                <div class="category-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.38 3.46L16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/></svg>
+                </div>
+                <h4 class="category-name">Apparel</h4>
+                <span class="category-count">128 Products</span>
+            </a>
+            <a href="#products" class="category-card">
+                <div class="category-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 17h20v2H2zM4 17V8a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v9"/></svg>
+                </div>
+                <h4 class="category-name">Footwear</h4>
+                <span class="category-count">64 Products</span>
+            </a>
+            <a href="#products" class="category-card">
+                <div class="category-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"/><polyline points="12 9 12 12 13.5 13.5"/></svg>
+                </div>
+                <h4 class="category-name">Accessories</h4>
+                <span class="category-count">92 Products</span>
+            </a>
+            <a href="#products" class="category-card">
+                <div class="category-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                </div>
+                <h4 class="category-name">Outdoor Gear</h4>
+                <span class="category-count">45 Products</span>
+            </a>
+        </div>
+    </section>
+
+    <!-- Main Store Catalog Grid -->
     <div class="store-layout" id="products">
         <aside>
             <!-- INTENTIONAL: Heading skip h1 -> h5 (WCAG 1.3.1) -->
-            <h5>Filter By Category</h5>
+            <h5>Categories</h5>
             <div class="filter-group">
-                <!-- INTENTIONAL: Checkboxes missing label association (WCAG 1.3.1) -->
-                <label><input type="checkbox" class="filter-checkbox" checked> All Items</label>
-                <label><input type="checkbox" class="filter-checkbox"> Apparel</label>
-                <label><input type="checkbox" class="filter-checkbox"> Footwear</label>
-                <label><input type="checkbox" class="filter-checkbox"> Accessories</label>
+                <!-- INTENTIONAL: Checkboxes missing explicit ID associations -->
+                <label><input type="checkbox" checked> All Items (8)</label>
+                <label><input type="checkbox"> Apparel (3)</label>
+                <label><input type="checkbox"> Footwear (2)</label>
+                <label><input type="checkbox"> Accessories (2)</label>
+                <label><input type="checkbox"> Outdoor (1)</label>
+            </div>
+
+            <div class="filter-divider"></div>
+
+            <h5>Price Range</h5>
+            <div class="filter-group">
+                <label><input type="checkbox"> Under $30</label>
+                <label><input type="checkbox" checked> $30 to $75</label>
+                <label><input type="checkbox"> $75 and Above</label>
+            </div>
+
+            <div class="filter-divider"></div>
+
+            <h5>Customer Rating</h5>
+            <div class="filter-group">
+                <label><input type="checkbox" checked> 4.5 Stars &amp; Up</label>
+                <label><input type="checkbox"> 4.0 Stars &amp; Up</label>
             </div>
         </aside>
 
         <main class="products-grid">
+            <!-- Product 1 -->
             <div class="product-card">
                 <div class="product-img-wrapper">
+                    <span class="discount-pill">20% Off</span>
                     <!-- INTENTIONAL: Image missing alt attribute (WCAG 1.1.1) -->
                     <img src="https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=80" class="hero-product">
                 </div>
                 <div class="product-body">
+                    <div class="product-rating">★★★★★ <span>(4.8)</span></div>
                     <h4 class="product-title">Classic Organic Cotton Tee</h4>
-                    <span class="product-price">$28.00</span>
+                    <div class="product-price-row">
+                        <span class="product-price">$28.00</span>
+                        <span class="product-old-price">$35.00</span>
+                    </div>
                     <button class="add-to-cart">Add To Cart</button>
                 </div>
             </div>
 
+            <!-- Product 2: INTENTIONAL BROKEN IMAGE 404 TO DEMONSTRATE REAL AURA ASSET REPAIR -->
             <div class="product-card">
                 <div class="product-img-wrapper">
-                    <!-- INTENTIONAL: Image missing alt attribute (WCAG 1.1.1) -->
-                    <img src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&auto=format&fit=crop&q=80" class="card-product-1">
+                    <span class="discount-pill">19% Off</span>
+                    <!-- INTENTIONAL: Broken image 404 with missing alt (WCAG 1.1.1) -->
+                    <img src="broken-product-sneaker.jpg" class="card-product-broken" onerror="this.classList.add('img-error'); this.alt='Image Load Error (404)';">
                 </div>
                 <div class="product-body">
+                    <div class="product-rating">★★★★★ <span>(4.9)</span></div>
                     <h4 class="product-title">Breathable Trail Sneakers</h4>
-                    <span class="product-price">$89.00</span>
+                    <div class="product-price-row">
+                        <span class="product-price">$89.00</span>
+                        <span class="product-old-price">$110.00</span>
+                    </div>
                     <button class="add-to-cart">Add To Cart</button>
                 </div>
             </div>
 
+            <!-- Product 3 -->
             <div class="product-card">
                 <div class="product-img-wrapper">
+                    <span class="discount-pill">25% Off</span>
                     <!-- INTENTIONAL: Image missing alt attribute (WCAG 1.1.1) -->
                     <img src="https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=500&auto=format&fit=crop&q=80" class="card-product-1">
                 </div>
                 <div class="product-body">
+                    <div class="product-rating">★★★★☆ <span>(4.7)</span></div>
                     <h4 class="product-title">Polarized UV Sunglasses</h4>
-                    <span class="product-price">$45.00</span>
+                    <div class="product-price-row">
+                        <span class="product-price">$45.00</span>
+                        <span class="product-old-price">$60.00</span>
+                    </div>
+                    <button class="add-to-cart">Add To Cart</button>
+                </div>
+            </div>
+
+            <!-- Product 4 -->
+            <div class="product-card">
+                <div class="product-img-wrapper">
+                    <span class="discount-pill">15% Off</span>
+                    <img src="https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=500&auto=format&fit=crop&q=80" alt="Waterproof Summit Daypack with ergonomic straps">
+                </div>
+                <div class="product-body">
+                    <div class="product-rating">★★★★★ <span>(4.9)</span></div>
+                    <h4 class="product-title">Waterproof Summit Daypack</h4>
+                    <div class="product-price-row">
+                        <span class="product-price">$68.00</span>
+                        <span class="product-old-price">$80.00</span>
+                    </div>
+                    <button class="add-to-cart">Add To Cart</button>
+                </div>
+            </div>
+
+            <!-- Product 5 -->
+            <div class="product-card">
+                <div class="product-img-wrapper">
+                    <span class="discount-pill">20% Off</span>
+                    <img src="https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=500&auto=format&fit=crop&q=80" alt="Lightweight Merino Wool Crew Pullover in Heather Gray">
+                </div>
+                <div class="product-body">
+                    <div class="product-rating">★★★★☆ <span>(4.6)</span></div>
+                    <h4 class="product-title">Lightweight Merino Wool Crew</h4>
+                    <div class="product-price-row">
+                        <span class="product-price">$52.00</span>
+                        <span class="product-old-price">$65.00</span>
+                    </div>
+                    <button class="add-to-cart">Add To Cart</button>
+                </div>
+            </div>
+
+            <!-- Product 6 -->
+            <div class="product-card">
+                <div class="product-img-wrapper">
+                    <span class="discount-pill">24% Off</span>
+                    <img src="https://images.unsplash.com/photo-1591195853828-11db59a44f6b?w=500&auto=format&fit=crop&q=80" alt="All-Weather Trekking Cargo Shorts with quick-dry fabric">
+                </div>
+                <div class="product-body">
+                    <div class="product-rating">★★★★★ <span>(4.8)</span></div>
+                    <h4 class="product-title">All-Weather Trekking Shorts</h4>
+                    <div class="product-price-row">
+                        <span class="product-price">$42.00</span>
+                        <span class="product-old-price">$55.00</span>
+                    </div>
+                    <button class="add-to-cart">Add To Cart</button>
+                </div>
+            </div>
+
+            <!-- Product 7 -->
+            <div class="product-card">
+                <div class="product-img-wrapper">
+                    <img src="https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=500&auto=format&fit=crop&q=80" alt="Insulated Stainless Water Bottle 32oz">
+                </div>
+                <div class="product-body">
+                    <div class="product-rating">★★★★★ <span>(4.9)</span></div>
+                    <h4 class="product-title">Insulated Stainless Bottle</h4>
+                    <div class="product-price-row">
+                        <span class="product-price">$24.00</span>
+                        <span class="product-old-price">$30.00</span>
+                    </div>
+                    <button class="add-to-cart">Add To Cart</button>
+                </div>
+            </div>
+
+            <!-- Product 8 -->
+            <div class="product-card">
+                <div class="product-img-wrapper">
+                    <span class="discount-pill">20% Off</span>
+                    <img src="https://images.unsplash.com/photo-1544441893-675973e31985?w=500&auto=format&fit=crop&q=80" alt="Packable Windbreaker Jacket in Deep Cobalt">
+                </div>
+                <div class="product-body">
+                    <div class="product-rating">★★★★☆ <span>(4.7)</span></div>
+                    <h4 class="product-title">Packable Windbreaker Jacket</h4>
+                    <div class="product-price-row">
+                        <span class="product-price">$78.00</span>
+                        <span class="product-old-price">$98.00</span>
+                    </div>
                     <button class="add-to-cart">Add To Cart</button>
                 </div>
             </div>
         </main>
     </div>
 
+    <!-- Featured Spotlight Section -->
+    <section class="spotlight-section" id="spotlight">
+        <div class="spotlight-card">
+            <img src="https://images.unsplash.com/photo-1508296695146-257a814070b4?w=800&auto=format&fit=crop&q=80" class="spotlight-img" alt="Summit Edition Carbon Fiber Trekking Poles">
+            <div class="spotlight-body">
+                <span class="hero-tag">Staff Pick</span>
+                <h3>Summit Edition Pro Daypack</h3>
+                <p>Engineered with ripstop nylon, aerodynamic air-mesh back ventilation, and quick-access hydration ports for extreme summer expeditions.</p>
+                <div class="size-selector">
+                    <button class="size-btn">S (18L)</button>
+                    <button class="size-btn active">M (24L)</button>
+                    <button class="size-btn">L (32L)</button>
+                </div>
+                <div class="product-price-row" style="margin-bottom: 20px;">
+                    <span class="product-price" style="font-size: 26px;">$119.00</span>
+                    <span class="product-old-price" style="font-size: 16px;">$149.00</span>
+                </div>
+                <button class="add-to-cart" style="padding: 14px 28px; font-size: 14px;">Add to Bag — Guaranteed 2-Day Shipping</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Customer Reviews Section -->
+    <section class="reviews-section" id="reviews">
+        <div class="section-header">
+            <div>
+                <h2 class="section-title">Verified Customer Reviews</h2>
+                <p class="section-subtitle">Over 10,000+ four and five-star reviews from verified adventurers</p>
+            </div>
+        </div>
+        <div class="reviews-grid">
+            <div class="review-card">
+                <div class="review-stars">★★★★★</div>
+                <p class="review-text">"The Trail Sneakers are the most comfortable hiking shoes I've owned. Breathes easily during 90-degree afternoon treks!"</p>
+                <div class="review-author">
+                    <span class="review-author-name">Alex Rivera</span>
+                    <span class="review-verified">✓ Verified Buyer</span>
+                </div>
+            </div>
+            <div class="review-card">
+                <div class="review-stars">★★★★★</div>
+                <p class="review-text">"Outstanding build quality on the Organic Cotton Tee. Maintains its fit and rich color even after dozens of washes."</p>
+                <div class="review-author">
+                    <span class="review-author-name">Sarah Chen</span>
+                    <span class="review-verified">✓ Verified Buyer</span>
+                </div>
+            </div>
+            <div class="review-card">
+                <div class="review-stars">★★★★★</div>
+                <p class="review-text">"The UV sunglasses cut through lake reflection flawlessly. Lightweight and snug fit during trail biking."</p>
+                <div class="review-author">
+                    <span class="review-author-name">Marcus Vance</span>
+                    <span class="review-verified">✓ Verified Buyer</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Newsletter Section -->
     <div class="newsletter">
         <h3>Subscribe to ShopX Weekly Deals</h3>
+        <p>Get exclusive early access to flash sales, outdoor gear giveaways, and sustainable apparel releases.</p>
         <form class="newsletter-form" onsubmit="return false;">
             <!-- INTENTIONAL: Form input missing label (WCAG 1.3.1) -->
             <input type="email" class="newsletter-input" placeholder="Enter your email address...">
@@ -164,14 +492,60 @@
         </form>
     </div>
 
+    <!-- Footer -->
     <footer>
-        <p>&copy; 2024 ShopX E-Commerce Full Remediation Demo.</p>
-        <!-- INTENTIONAL: Link wrapping SVG icon without text or aria-label (WCAG 4.1.2) -->
-        <a href="/social">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="#38bdf8">
-                <path d="M22.46 6c-.85.38-1.78.64-2.73.76 1-.6 1.76-1.54 2.12-2.67-.93.55-1.96.95-3.06 1.17-.88-.94-2.13-1.53-3.51-1.53-2.66 0-4.81 2.16-4.81 4.81 0 .38.04.75.13 1.1-4-.2-7.58-2.11-9.96-5.02-.42.72-.66 1.56-.66 2.46 0 1.68.85 3.16 2.14 4.02-.79-.02-1.53-.24-2.18-.6v.06c0 2.35 1.67 4.31 3.88 4.76-.4.1-.83.16-1.27.16-.31 0-.62-.03-.92-.08.63 1.96 2.45 3.39 4.6 3.43-1.68 1.32-3.81 2.1-6.12 2.1-.4 0-.79-.02-1.17-.07 2.19 1.4 4.78 2.22 7.57 2.22 9.07 0 14.02-7.52 14.02-14.02 0-.21 0-.42-.01-.63.96-.7 1.8-1.56 2.46-2.55z"/>
-            </svg>
-        </a>
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <h4>SHOP<span>X</span></h4>
+                <p>Sustainable performance apparel and outdoor gear designed for conscious explorers. Crafted with recycled materials and ethical labor.</p>
+            </div>
+            <div class="footer-col">
+                <h5>Shop</h5>
+                <ul>
+                    <li><a href="#products">Apparel</a></li>
+                    <li><a href="#products">Footwear</a></li>
+                    <li><a href="#products">Accessories</a></li>
+                    <li><a href="#products">Outdoor Gear</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h5>Help &amp; Support</h5>
+                <ul>
+                    <li><a href="#contact">Shipping Info</a></li>
+                    <li><a href="#contact">Easy Returns</a></li>
+                    <li><a href="#contact">Order Status</a></li>
+                    <li><a href="#contact">Size Guide</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h5>Company</h5>
+                <ul>
+                    <li><a href="#about">Our Story</a></li>
+                    <li><a href="#about">Sustainability</a></li>
+                    <li><a href="#about">Careers</a></li>
+                    <li><a href="#about">Privacy Policy</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <p>&copy; 2026 ShopX E-Commerce Remediation Demo. All rights reserved.</p>
+            <div class="social-links">
+                <!-- INTENTIONAL: Social links missing text or aria-label (WCAG 4.1.2) -->
+                <a href="#social-twitter" class="social-link">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M22.46 6c-.85.38-1.78.64-2.73.76 1-.6 1.76-1.54 2.12-2.67-.93.55-1.96.95-3.06 1.17-.88-.94-2.13-1.53-3.51-1.53-2.66 0-4.81 2.16-4.81 4.81 0 .38.04.75.13 1.1-4-.2-7.58-2.11-9.96-5.02-.42.72-.66 1.56-.66 2.46 0 1.68.85 3.16 2.14 4.02-.79-.02-1.53-.24-2.18-.6v.06c0 2.35 1.67 4.31 3.88 4.76-.4.1-.83.16-1.27.16-.31 0-.62-.03-.92-.08.63 1.96 2.45 3.39 4.6 3.43-1.68 1.32-3.81 2.1-6.12 2.1-.4 0-.79-.02-1.17-.07 2.19 1.4 4.78 2.22 7.57 2.22 9.07 0 14.02-7.52 14.02-14.02 0-.21 0-.42-.01-.63.96-.7 1.8-1.56 2.46-2.55z"/>
+                    </svg>
+                </a>
+                <a href="#social-instagram" class="social-link">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                        <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                        <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                    </svg>
+                </a>
+            </div>
+        </div>
     </footer>
 </body>
 </html>

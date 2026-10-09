@@ -12,16 +12,27 @@ import { BeforeAfterComparison } from "@/components/dashboard/BeforeAfterCompari
 import { ReportModal } from "@/components/dashboard/ReportModal";
 import { DemoSelectorModal, DemoSiteOption } from "@/components/dashboard/DemoSelectorModal";
 import { DocumentationModal } from "@/components/dashboard/DocumentationModal";
+import { WebsiteIntelligencePanel } from "@/components/dashboard/WebsiteIntelligencePanel";
+import { PreviewModal } from "@/components/dashboard/PreviewModal";
+import { ElementInspectorModal } from "@/components/dashboard/ElementInspectorModal";
+import { AskAuraModal } from "@/components/dashboard/AskAuraModal";
 
 import {
   startScan,
   getScan,
   getScans,
   fixIssue,
+  fixBlockingIssues,
   fixAllIssues,
   getScanReport,
   getDemoSiteUrl,
   getDemoSites,
+  applyPalette,
+  applyBundle,
+  rollbackScan,
+  generatePreview,
+  inspectElement,
+  askAura,
   getApiBase,
   API_BASE,
 } from "@/lib/api";
@@ -32,6 +43,9 @@ import type {
   AccessibilityIssue,
   TimelineEvent,
   ScanReport,
+  PreviewData,
+  ElementInspectionData,
+  AskAuraResponse,
 } from "@/lib/types";
 import { History, Globe, Clock, ArrowRight, CheckCircle2, AlertCircle, Scan, Eye, FileText, Sparkles } from "lucide-react";
 
@@ -45,6 +59,8 @@ export default function DashboardPage() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [fixingIssueId, setFixingIssueId] = useState<string | null>(null);
   const [isFixingAll, setIsFixingAll] = useState(false);
+  const [isFixingBlocking, setIsFixingBlocking] = useState(false);
+  const [isRollingBack, setIsRollingBack] = useState(false);
   const [scanLoading, setScanLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
   const [error, setError] = useState("");
@@ -57,7 +73,70 @@ export default function DashboardPage() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mobileActiveView, setMobileActiveView] = useState<"issues" | "detail" | "visualizer" | "all">("all");
 
+  // AURA Copilot, Inspector & Preview Modal states
+  const [previewData, setPreviewData] = useState<PreviewData | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isApplyingPreview, setIsApplyingPreview] = useState(false);
+  const [inspectorData, setInspectorData] = useState<ElementInspectionData | null>(null);
+  const [isInspectorOpen, setIsInspectorOpen] = useState(false);
+  const [isAskAuraOpen, setIsAskAuraOpen] = useState(false);
+
   const wsRef = useRef<WebSocket | null>(null);
+
+  // Listen for DOM element inspector postMessage events from preview and sandbox iframes
+  useEffect(() => {
+    const handleMessage = async (e: MessageEvent) => {
+      if (e.data && e.data.type === "AURA_ELEMENT_INSPECT") {
+        const { selector, text, tag } = e.data;
+        if (currentScanId) {
+          try {
+            const res = await inspectElement(currentScanId, selector, text, tag);
+            setInspectorData(res);
+            setIsInspectorOpen(true);
+          } catch (err) {
+            console.error("Inspect element error:", err);
+          }
+        }
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [currentScanId]);
+
+  const handlePreviewItem = async (type: string, id: string) => {
+    if (!currentScanId) return;
+    try {
+      const data = await generatePreview(currentScanId, type, id);
+      setPreviewData(data);
+      setIsPreviewOpen(true);
+    } catch (err) {
+      console.error("Failed to generate preview:", err);
+    }
+  };
+
+  const handleApplyFromPreview = async (type: string, id: string) => {
+    if (!currentScanId) return;
+    setIsApplyingPreview(true);
+    try {
+      if (type === "palette") {
+        await handleApplyPalette(id);
+      } else {
+        await handleApplyBundle(id);
+      }
+    } finally {
+      setIsApplyingPreview(false);
+    }
+  };
+
+  const handleAskAuraSubmit = async (question: string): Promise<AskAuraResponse | null> => {
+    if (!currentScanId) return null;
+    try {
+      return await askAura(currentScanId, question);
+    } catch (err) {
+      console.error("Failed to ask AURA:", err);
+      return null;
+    }
+  };
 
   // Fetch demo options and scan history on load
   const fetchScansHistory = useCallback(async () => {
@@ -128,14 +207,14 @@ export default function DashboardPage() {
     wsRef.current = ws;
 
     return () => {
-      ws.close();
+      ws?.close();
     };
   }, [currentScanId, fetchScan]);
 
   // Polling fallback: guarantees timeline and issues update even if WebSocket drops
   useEffect(() => {
     if (!currentScanId) return;
-    if (scanData && scanData.scan_id === currentScanId && (scanData.status === "complete" || scanData.status === "error")) return;
+    if (scanData && scanData.scan_id === currentScanId && (scanData.status === "complete" || scanData.status === "completed_with_warnings" || scanData.status === "error")) return;
 
     const interval = setInterval(() => {
       fetchScan(currentScanId);
@@ -238,41 +317,130 @@ export default function DashboardPage() {
     }
   }
 
-  // Handle Auto-Fix All Issues in Scan (Step-by-step with real-time UI updates)
+  // Handle Auto-Fix All Issues in Scan (Dependency-aware scheduler with priority P0->P1->P2->P3)
   async function handleFixAll() {
     if (!currentScanId) return;
     setIsFixingAll(true);
     setError("");
     try {
       const currentIssues = scanData?.issues || [];
-      const nonFixed = currentIssues.filter((i) => i.status !== "fixed");
+      const nonFixed = currentIssues.filter(
+        (i) =>
+          i.status !== "fixed" &&
+          i.fix_classification !== "third_party" &&
+          i.fix_classification !== "not_safe_to_auto_fix" &&
+          i.fix_classification !== "source_access_required"
+      );
 
-      for (const issue of nonFixed) {
+      // Prioritize: P0 -> P1 -> P2 -> P3
+      const priorityWeight = (p?: string, isBlocking?: boolean, cat?: string) => {
+        if (p === "P0") return 0;
+        if (p === "P1" || isBlocking) return 1;
+        if (p === "P2" || cat === "problem") return 2;
+        return 3;
+      };
+
+      const sortedNonFixed = [...nonFixed].sort(
+        (a, b) =>
+          priorityWeight(a.priority, a.is_blocking, a.category) -
+          priorityWeight(b.priority, b.is_blocking, b.category)
+      );
+
+      for (const issue of sortedNonFixed) {
         setSelectedIssue(issue);
         setFixingIssueId(issue.id);
         try {
           const res = await fixIssue(currentScanId, issue.id);
           if (!res.success && res.error) {
-            console.warn(`Fix issue ${issue.id}:`, res.error);
+            console.warn(`[Auto-Fix] Issue ${issue.id} isolated failure:`, res.error);
           }
           await fetchScan(currentScanId);
         } catch (e) {
           const errMsg = e instanceof Error ? e.message : "Fix error";
-          console.error(`Fix failed for ${issue.id}:`, errMsg);
+          console.error(`[Auto-Fix] Exception on ${issue.id}:`, errMsg);
         }
         // Brief visual pause so the user sees each fix verify live
-        await new Promise((r) => setTimeout(r, 600));
+        await new Promise((r) => setTimeout(r, 450));
       }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "Auto-Fix All encountered an issue";
-      console.error("Auto-Fix All failed:", errMsg);
-      setError(errMsg);
+      console.error("Auto-Fix All notice:", errMsg);
     } finally {
       setFixingIssueId(null);
       setIsFixingAll(false);
       if (currentScanId) {
         await fetchScan(currentScanId);
       }
+    }
+  }
+
+  // Handle Fix Blocking (P0/P1) Issues First
+  async function handleFixBlocking() {
+    if (!currentScanId || isFixingBlocking) return;
+    setIsFixingBlocking(true);
+    setError("");
+    try {
+      await fixBlockingIssues(currentScanId);
+      await fetchScan(currentScanId);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "Failed to remediate blocking issues";
+      console.error("Fix blocking failed:", errMsg);
+      setError(`Fix blocking failed: ${errMsg}`);
+    } finally {
+      setIsFixingBlocking(false);
+    }
+  }
+
+  // Handle Apply Color Palette Direction
+  async function handleApplyPalette(paletteId: string) {
+    if (!currentScanId) return;
+    setFixingIssueId(`ui-palette-${paletteId}`);
+    try {
+      const res = await applyPalette(currentScanId, paletteId);
+      if (res.success) {
+        await fetchScan(currentScanId);
+      }
+    } catch (err) {
+      console.error("Failed to apply palette:", err);
+    } finally {
+      setFixingIssueId(null);
+    }
+  }
+
+  // Handle Apply Improvement Bundle
+  async function handleApplyBundle(bundleId: string) {
+    if (!currentScanId) return;
+    setFixingIssueId(`ui-bundle-${bundleId}`);
+    try {
+      const res = await applyBundle(currentScanId, bundleId);
+      if (res.success) {
+        await fetchScan(currentScanId);
+      }
+    } catch (err) {
+      console.error("Failed to apply bundle:", err);
+      setError(err instanceof Error ? err.message : "Failed to apply bundle");
+    } finally {
+      setFixingIssueId(null);
+    }
+  }
+
+  // Handle Safe Rollback to Prior Sandbox Snapshot
+  async function handleRollback() {
+    if (!currentScanId) return;
+    setIsRollingBack(true);
+    setError("");
+    try {
+      const res = await rollbackScan(currentScanId);
+      if (res.success) {
+        await fetchScan(currentScanId);
+      } else {
+        setError(res.message || "Failed to rollback.");
+      }
+    } catch (err) {
+      console.error("Failed to rollback:", err);
+      setError(err instanceof Error ? err.message : "Rollback failed.");
+    } finally {
+      setIsRollingBack(false);
     }
   }
 
@@ -349,6 +517,20 @@ export default function DashboardPage() {
       const unresolved = issuesList.filter((i) => i.status !== "fixed" && i.status !== "needs_review").length;
       const needs_review = issuesList.filter((i) => i.status === "needs_review").length;
 
+      const initDeductions = critical * 12 + serious * 8 + moderate * 5 + minor * 2;
+      const health_score_initial = Math.max(15, Math.min(100, 100 - initDeductions));
+      const currDeductions =
+        issuesList.filter((i) => i.status !== "fixed" && i.severity === "critical").length * 12 +
+        issuesList.filter((i) => i.status !== "fixed" && i.severity === "serious").length * 8 +
+        issuesList.filter((i) => i.status !== "fixed" && i.severity === "moderate").length * 5 +
+        issuesList.filter((i) => i.status !== "fixed" && i.severity === "minor").length * 2;
+      const health_score_current = Math.max(15, Math.min(100, 100 - currDeductions));
+      const problems_count = issuesList.filter((i) => (i.category || "problem") === "problem").length;
+      const improvements_count = issuesList.filter((i) => i.category === "improvement").length;
+      const fixed_improvements = issuesList.filter((i) => i.category === "improvement" && i.status === "fixed").length;
+      const base_ui = scanData?.summary?.ui_quality_initial ?? scanData?.design_scores?.overall_ui_quality ?? 70;
+      const ui_quality_current = Math.min(100, base_ui + fixed_improvements * 10);
+
       return {
         total_issues: issuesList.length,
         critical,
@@ -358,6 +540,12 @@ export default function DashboardPage() {
         fixed,
         unresolved,
         needs_review,
+        problems_count,
+        improvements_count,
+        health_score_initial: scanData?.summary?.health_score_initial ?? health_score_initial,
+        health_score_current: scanData?.summary?.health_score_current ?? health_score_current,
+        ui_quality_initial: base_ui,
+        ui_quality_current,
       };
     }
     return (
@@ -370,6 +558,8 @@ export default function DashboardPage() {
         fixed: 0,
         unresolved: 0,
         needs_review: 0,
+        health_score_initial: 100,
+        health_score_current: 100,
       }
     );
   }, [scanData?.summary, scanData?.issues]);
@@ -430,6 +620,8 @@ export default function DashboardPage() {
               loading={scanLoading}
               demoLoading={demoLoading}
               error={error}
+              scanStatus={scanData?.status || "ready"}
+              hasVerifiedFixes={fixedCount > 0}
             />
           </div>
 
@@ -439,6 +631,18 @@ export default function DashboardPage() {
             scanStatus={scanData?.status || "ready"}
             onSelectFilter={(newFilter) => setFilter(newFilter)}
             onOpenDocs={() => setIsDocsOpen(true)}
+          />
+
+          {/* Section 2.5: Website Intelligence & Design Audit */}
+          <WebsiteIntelligencePanel
+            scanData={scanData}
+            scanId={currentScanId || undefined}
+            onFixIssue={handleFixIssue}
+            onApplyPalette={handleApplyPalette}
+            onApplyBundle={handleApplyBundle}
+            onPreviewItem={handlePreviewItem}
+            onAskAura={() => setIsAskAuraOpen(true)}
+            isFixing={Boolean(fixingIssueId || isFixingAll)}
           />
 
           {/* Section 3: Real-Time Agent Execution Timeline */}
@@ -502,14 +706,14 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Main Workbench Grid (Side-by-side on desktop, responsive tab-aware on mobile) */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch min-h-[550px]">
+            {/* Main Workbench Grid (Controlled viewport height on desktop, independent internal scrolls) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch lg:h-[calc(100vh-140px)] lg:min-h-[580px] lg:max-h-[860px]">
               {/* Left Column: Issue Explorer */}
               <div
-                className={`lg:col-span-4 min-h-[480px] ${
+                className={`lg:col-span-4 h-full min-h-0 flex flex-col ${
                   mobileActiveView !== "all" && mobileActiveView !== "issues"
-                    ? "hidden lg:block"
-                    : "block"
+                    ? "hidden lg:flex"
+                    : "flex"
                 }`}
               >
                 <IssueExplorer
@@ -527,15 +731,17 @@ export default function DashboardPage() {
                   setFilter={setFilter}
                   onFixAll={handleFixAll}
                   isFixingAll={isFixingAll}
+                  onFixBlocking={handleFixBlocking}
+                  isFixingBlocking={isFixingBlocking}
                 />
               </div>
 
               {/* Middle Column: Issue Detail Panel */}
               <div
-                className={`lg:col-span-4 min-h-[480px] ${
+                className={`lg:col-span-4 h-full min-h-0 flex flex-col ${
                   mobileActiveView !== "all" && mobileActiveView !== "detail"
-                    ? "hidden lg:block"
-                    : "block"
+                    ? "hidden lg:flex"
+                    : "flex"
                 }`}
               >
                 <IssueDetailPanel
@@ -548,10 +754,10 @@ export default function DashboardPage() {
 
               {/* Right Column: Before / After Visualizer */}
               <div
-                className={`lg:col-span-4 min-h-[480px] ${
+                className={`lg:col-span-4 h-full min-h-0 flex flex-col ${
                   mobileActiveView !== "all" && mobileActiveView !== "visualizer"
-                    ? "hidden lg:block"
-                    : "block"
+                    ? "hidden lg:flex"
+                    : "flex"
                 }`}
               >
                 <BeforeAfterComparison
@@ -560,7 +766,11 @@ export default function DashboardPage() {
                   onViewReport={handleViewReport}
                   scanId={currentScanId || undefined}
                   targetUrl={scanData?.url}
+                  originalUrl={scanData?.original_url || scanData?.url}
                   isFixing={fixingIssueId === selectedIssue?.id || isFixingAll}
+                  issues={scanData?.issues || []}
+                  onRollback={handleRollback}
+                  isRollingBack={isRollingBack}
                 />
               </div>
             </div>
@@ -707,6 +917,51 @@ export default function DashboardPage() {
         onOpenDemo={() => {
           setIsDocsOpen(false);
           handleOpenDemoModal();
+        }}
+      />
+
+      {/* Isolated Sandbox Preview Modal */}
+      <PreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        previewData={previewData}
+        onApply={handleApplyFromPreview}
+        isApplying={isApplyingPreview}
+        onInspectElement={(info) => {
+          if (currentScanId) {
+            inspectElement(currentScanId, info.selector, info.text, info.tag)
+              .then((res) => {
+                setInspectorData(res);
+                setIsInspectorOpen(true);
+              })
+              .catch(() => {});
+          }
+        }}
+      />
+
+      {/* Element-Level AI Inspector Modal */}
+      <ElementInspectorModal
+        isOpen={isInspectorOpen}
+        onClose={() => setIsInspectorOpen(false)}
+        inspection={inspectorData}
+        onPreviewFix={() => {
+          setIsInspectorOpen(false);
+          handlePreviewItem("bundle", "modern_refresh");
+        }}
+        onApplyFix={() => {
+          setIsInspectorOpen(false);
+          handleApplyBundle("modern_refresh");
+        }}
+      />
+
+      {/* Ask AURA Design Copilot Modal */}
+      <AskAuraModal
+        isOpen={isAskAuraOpen}
+        onClose={() => setIsAskAuraOpen(false)}
+        onAsk={handleAskAuraSubmit}
+        onPreviewAction={(actionType, actionId) => {
+          setIsAskAuraOpen(false);
+          handlePreviewItem(actionType, actionId);
         }}
       />
     </div>

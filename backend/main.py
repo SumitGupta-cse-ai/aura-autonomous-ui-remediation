@@ -7,25 +7,35 @@ if sys.platform == "win32":
 
 import uuid
 import os
+import re
 import json
 import shutil
 import difflib
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional, Any
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from pydantic import BaseModel
 from dotenv import load_dotenv
 
 load_dotenv()
 
 from models.schemas import (
     ScanRequest, ScanResponse, ScanStatus, ScanData,
-    TimelineEvent, TimelineEventType, FixResult,
+    TimelineEvent, TimelineEventType, FixResult, GitHubPRRequest,
+    IssueStatus, VerificationStatus,
+)
+from core.export_engine import (
+    generate_fixed_website_archive,
+    generate_fix_pack_archive,
+    generate_comprehensive_audit_report,
+    create_or_preview_github_pr,
+    get_sandbox_html_for_scan,
 )
 from agents.orchestrator import Orchestrator
 from core.security import validate_url, rate_limiter
@@ -68,6 +78,13 @@ if frontend_url:
     if cleaned not in cors_origins:
         cors_origins.append(cleaned)
 
+cors_env = os.getenv("CORS_ORIGINS")
+if cors_env:
+    for o in cors_env.split(","):
+        o_clean = o.strip().rstrip("/")
+        if o_clean and o_clean not in cors_origins:
+            cors_origins.append(o_clean)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
@@ -87,14 +104,21 @@ async def root():
     }
 
 
-def get_backend_base_url() -> str:
-    """Return the canonical base URL for this server (supports Render cloud)."""
+def get_backend_base_url(request: Optional[Request] = None) -> str:
+    """Return the canonical base URL for this server (supports Render, Vercel, Railway, and reverse proxies)."""
     render_url = os.getenv("RENDER_EXTERNAL_URL")
     if render_url:
         return render_url.rstrip("/")
     app_url = os.getenv("APP_URL") or os.getenv("BACKEND_URL")
     if app_url:
         return app_url.rstrip("/")
+    if request:
+        # Check reverse proxy headers
+        proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+        host = request.headers.get("x-forwarded-host", request.headers.get("host"))
+        if host:
+            return f"{proto}://{host}"
+        return str(request.base_url).rstrip("/")
     port = os.getenv("PORT", "8000")
     return f"http://localhost:{port}"
 
@@ -105,6 +129,8 @@ if not (demo_site_path / "demo1.html").exists():
 demo_site_path.mkdir(parents=True, exist_ok=True)
 if demo_site_path.exists():
     app.mount("/demo-site", StaticFiles(directory=str(demo_site_path), html=True), name="demo-site")
+    if (demo_site_path / "assets").exists():
+        app.mount("/assets", StaticFiles(directory=str(demo_site_path / "assets")), name="demo-assets")
 
 # ─── WebSocket Manager ───
 
@@ -157,6 +183,7 @@ async def start_scan(request: ScanRequest, background_tasks: BackgroundTasks):
         url=url,
         status=ScanStatus.PENDING,
         created_at=created_at,
+        original_url=url,
     )
     orchestrator.register_pending_scan(pending_scan)
 
@@ -196,14 +223,19 @@ async def get_scan(scan_id: str):
     scan = orchestrator.get_scan(scan_id)
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
-    return scan.model_dump()
+    return JSONResponse(content=scan.model_dump())
 
 
 @app.get("/api/scans")
 async def get_all_scans():
-    """Get all scans."""
+    """Get all scans with lightweight summary."""
     scans = orchestrator.get_all_scans()
-    return [s.model_dump() for s in scans]
+    lightweight = []
+    for s in scans:
+        dump = s.model_dump(exclude={"issues", "timeline", "screenshot"})
+        dump["issues_count"] = len(s.issues)
+        lightweight.append(dump)
+    return JSONResponse(content=lightweight)
 
 
 @app.post("/api/scan/{scan_id}/fix/{issue_id}")
@@ -223,6 +255,212 @@ async def fix_issue(scan_id: str, issue_id: str):
         })
 
     return result
+
+
+@app.post("/api/scan/{scan_id}/fix-blocking")
+async def fix_blocking_issues(scan_id: str):
+    """Automatically fix all unresolved P0 and P1 blocking issues in order."""
+    scan = orchestrator.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    result = await orchestrator.fix_blocking_issues(scan_id)
+
+    updated = orchestrator.get_scan(scan_id)
+    if updated:
+        await ws_manager.broadcast(scan_id, {
+            "type": "status_change",
+            "status": updated.status.value,
+        })
+
+    return result
+
+
+@app.post("/api/scan/{scan_id}/retry/{issue_id}")
+async def retry_issue(scan_id: str, issue_id: str):
+    """Retry fixing a specific issue."""
+    scan = orchestrator.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    result = await orchestrator.fix_issue(scan_id, issue_id)
+
+    updated = orchestrator.get_scan(scan_id)
+    if updated:
+        await ws_manager.broadcast(scan_id, {
+            "type": "status_change",
+            "status": updated.status.value,
+        })
+
+    return result
+
+
+@app.post("/api/scan/{scan_id}/palette/{palette_id}")
+async def apply_palette(scan_id: str, palette_id: str):
+    """Apply a selected color palette (Option A, B, C, D) to the sandbox."""
+    scan = orchestrator.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    result = await orchestrator.apply_palette(scan_id, palette_id)
+
+    updated = orchestrator.get_scan(scan_id)
+    if updated:
+        await ws_manager.broadcast(scan_id, {
+            "type": "status_change",
+            "status": updated.status.value,
+        })
+
+    return result
+
+
+@app.post("/api/scan/{scan_id}/bundle/{bundle_id}")
+async def apply_bundle(scan_id: str, bundle_id: str):
+    """Apply an improvement bundle (modern_refresh, accessibility_readability, premium_refresh) to sandbox."""
+    scan = orchestrator.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    result = await orchestrator.apply_bundle(scan_id, bundle_id)
+
+    updated = orchestrator.get_scan(scan_id)
+    if updated:
+        await ws_manager.broadcast(scan_id, {
+            "type": "status_change",
+            "status": updated.status.value,
+        })
+
+    return result
+
+
+@app.post("/api/scan/{scan_id}/rollback")
+async def rollback_scan(scan_id: str):
+    """Rollback sandbox to previous snapshot."""
+    scan = orchestrator.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    result = await orchestrator.rollback_scan(scan_id)
+
+    updated = orchestrator.get_scan(scan_id)
+    if updated:
+        await ws_manager.broadcast(scan_id, {
+            "type": "status_change",
+            "status": updated.status.value,
+        })
+
+    return result
+
+
+class PreviewRequest(BaseModel):
+    type: str  # "bundle", "palette", "issue", "variant"
+    id: str
+
+
+@app.post("/api/scan/{scan_id}/preview")
+async def generate_preview(scan_id: str, payload: PreviewRequest):
+    """Generate an isolated preview snapshot without modifying active sandbox."""
+    scan = orchestrator.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    result = await orchestrator.generate_preview(scan_id, payload.type, payload.id)
+    return result
+
+
+@app.get("/sandbox/{scan_id}/preview")
+async def serve_sandbox_preview(scan_id: str):
+    """Serve the isolated preview page for a scan."""
+    candidates = [
+        demo_site_path / "sandbox" / scan_id / "preview.html",
+        Path(__file__).resolve().parent / "demo-site" / "sandbox" / scan_id / "preview.html",
+        Path(__file__).resolve().parent.parent / "demo-site" / "sandbox" / scan_id / "preview.html",
+    ]
+    for c in candidates:
+        if c.exists():
+            return FileResponse(str(c), media_type="text/html")
+    # Fallback to after sandbox
+    return await serve_sandbox_after(scan_id)
+
+
+@app.get("/sandbox/{scan_id}/show-changes")
+async def serve_sandbox_show_changes(scan_id: str):
+    """Serve the sandboxed page with visible category change highlights and top legend."""
+    scan = orchestrator.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    html_content = orchestrator.generate_show_changes_html(scan_id)
+    return HTMLResponse(content=html_content)
+
+
+class InspectElementRequest(BaseModel):
+    selector: str = ""
+    element_text: str = ""
+    tag: str = ""
+
+
+@app.post("/api/scan/{scan_id}/inspect-element")
+async def inspect_element(scan_id: str, payload: InspectElementRequest):
+    """Provide detailed element-level AI inspection with Before vs After metrics."""
+    scan = orchestrator.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    return orchestrator.inspect_element(scan_id, payload.selector, payload.element_text, payload.tag)
+
+
+class AskAuraRequest(BaseModel):
+    question: str
+
+
+@app.post("/api/scan/{scan_id}/ask")
+async def ask_aura(scan_id: str, payload: AskAuraRequest):
+    """Ask AURA AI website design and remediation advisor."""
+    scan = orchestrator.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    return orchestrator.ask_aura(scan_id, payload.question)
+
+
+@app.get("/api/scan/{scan_id}/variants")
+async def get_design_variants(scan_id: str):
+    """Get the 3 design variants available for the website."""
+    scan = orchestrator.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    return orchestrator.get_variants(scan_id)
+
+
+@app.get("/api/scan/{scan_id}/versions")
+async def get_version_history(scan_id: str):
+    """Get version history snapshots for the scan."""
+    scan = orchestrator.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    return orchestrator.get_versions(scan_id)
+
+
+@app.post("/api/scan/{scan_id}/restore/{version_index}")
+async def restore_version(scan_id: str, version_index: int):
+    """Restore sandbox to a specific historical version."""
+    scan = orchestrator.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    result = await orchestrator.restore_version(scan_id, version_index)
+    updated = orchestrator.get_scan(scan_id)
+    if updated:
+        await ws_manager.broadcast(scan_id, {
+            "type": "status_change",
+            "status": updated.status.value,
+        })
+    return result
+
+
+@app.get("/api/scan/{scan_id}/health-scores")
+async def get_health_scores(scan_id: str):
+    """Get real 8-dimension health scores responding to detected and resolved issues."""
+    scan = orchestrator.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    return orchestrator.get_health_scores(scan_id)
 
 
 @app.post("/api/scan/{scan_id}/fix-all")
@@ -246,16 +484,16 @@ async def get_report(scan_id: str):
 
 
 @app.get("/api/demo-site-url")
-async def get_demo_site_url():
+async def get_demo_site_url(request: Request):
     """Return default demo site URL."""
-    base = get_backend_base_url()
+    base = get_backend_base_url(request)
     return {"url": f"{base}/demo-site/full_remediation.html"}
 
 
 @app.get("/api/demo-sites")
-async def get_demo_sites():
+async def get_demo_sites(request: Request):
     """Return metadata for all built-in offline demo sites."""
-    base = f"{get_backend_base_url()}/demo-site"
+    base = f"{get_backend_base_url(request)}/demo-site"
     return [
         {
             "id": "full_remediation",
@@ -293,20 +531,82 @@ async def get_demo_sites():
             "difficulty": "Advanced",
             "demonstrates": "Table button ARIA labeling, dark theme contrast audit, avatar alt text fix",
         },
+        {
+            "id": "clean_site",
+            "name": "Clean Website (Zero-Error Demo)",
+            "description": "Apex Studio: Technically healthy, accessible modern website with 0 accessibility errors. Demonstrates Stage 2 AI Website Improvement Advisor, design assessment, and authentic color palettes.",
+            "url": f"{base}/clean_site.html",
+            "expected_issues": "0 errors, 5 AI improvements",
+            "difficulty": "Zero-Error Showcase",
+            "demonstrates": "Zero Errors != Zero Value: AI Website Improvement Advisor, 9-dimension scoring, 4 brand palettes",
+        },
     ]
 
 
-@app.get("/sandbox/{scan_id}")
-async def serve_sandbox(scan_id: str):
-    """Serve the sandboxed patched page for a scan."""
+@app.get("/sandbox/{scan_id}/before")
+@app.get("/sandbox/{scan_id}/original")
+async def serve_sandbox_before(scan_id: str):
+    """Serve the original untouched website snapshot for a scan."""
     candidates = [
+        demo_site_path / "sandbox" / scan_id / "before.html",
+        Path(__file__).resolve().parent / "demo-site" / "sandbox" / scan_id / "before.html",
+        Path(__file__).resolve().parent.parent / "demo-site" / "sandbox" / scan_id / "before.html",
+    ]
+    for c in candidates:
+        if c.exists():
+            return FileResponse(str(c), media_type="text/html")
+
+    # If before.html is not created yet, check original url from scan
+    scan = orchestrator.get_scan(scan_id)
+    if scan and scan.url:
+        clean_url = scan.url.split("?")[0]
+        if clean_url.endswith(".html"):
+            demo_name = clean_url.split("/")[-1]
+            demo_target = demo_site_path / demo_name
+            if demo_target.exists():
+                return FileResponse(str(demo_target), media_type="text/html")
+
+    raise HTTPException(status_code=404, detail="Before snapshot not found")
+
+
+@app.get("/sandbox/{scan_id}/after")
+@app.get("/sandbox/{scan_id}/improved")
+async def serve_sandbox_after(scan_id: str):
+    """Serve the remediated website sandbox for a scan."""
+    candidates = [
+        demo_site_path / "sandbox" / scan_id / "after.html",
         demo_site_path / "sandbox" / scan_id / "index.html",
+        Path(__file__).resolve().parent / "demo-site" / "sandbox" / scan_id / "after.html",
         Path(__file__).resolve().parent / "demo-site" / "sandbox" / scan_id / "index.html",
+        Path(__file__).resolve().parent.parent / "demo-site" / "sandbox" / scan_id / "after.html",
         Path(__file__).resolve().parent.parent / "demo-site" / "sandbox" / scan_id / "index.html",
     ]
     for c in candidates:
         if c.exists():
             return FileResponse(str(c), media_type="text/html")
+
+    # Fallback to before snapshot if after has not diverged yet
+    return await serve_sandbox_before(scan_id)
+
+
+@app.get("/sandbox/{scan_id}")
+async def serve_sandbox(scan_id: str):
+    """Serve the sandboxed patched page for a scan (falls back to before or base page)."""
+    candidates = [
+        demo_site_path / "sandbox" / scan_id / "after.html",
+        demo_site_path / "sandbox" / scan_id / "index.html",
+        demo_site_path / "sandbox" / scan_id / "before.html",
+        Path(__file__).resolve().parent / "demo-site" / "sandbox" / scan_id / "after.html",
+        Path(__file__).resolve().parent / "demo-site" / "sandbox" / scan_id / "index.html",
+        Path(__file__).resolve().parent / "demo-site" / "sandbox" / scan_id / "before.html",
+        Path(__file__).resolve().parent.parent / "demo-site" / "sandbox" / scan_id / "after.html",
+        Path(__file__).resolve().parent.parent / "demo-site" / "sandbox" / scan_id / "index.html",
+        Path(__file__).resolve().parent.parent / "demo-site" / "sandbox" / scan_id / "before.html",
+    ]
+    for c in candidates:
+        if c.exists():
+            return FileResponse(str(c), media_type="text/html")
+
     # Fallback to single sandbox preview if exists
     fallbacks = [
         demo_site_path / "sandbox_preview.html",
@@ -316,6 +616,17 @@ async def serve_sandbox(scan_id: str):
     for fb in fallbacks:
         if fb.exists():
             return FileResponse(str(fb), media_type="text/html")
+
+    # If scan exists, serve the base demo page directly so preview is NEVER broken
+    scan = orchestrator.get_scan(scan_id)
+    if scan and scan.url:
+        clean_url = scan.url.split("?")[0]
+        if clean_url.endswith(".html"):
+            demo_name = clean_url.split("/")[-1]
+            demo_target = demo_site_path / demo_name
+            if demo_target.exists():
+                return FileResponse(str(demo_target), media_type="text/html")
+
     raise HTTPException(status_code=404, detail="Sandbox preview not available yet")
 
 
@@ -349,112 +660,211 @@ async def get_issue_diff(scan_id: str, issue_id: str):
     return {"diff": "\n".join(diff_lines), "has_diff": len(diff_lines) > 0}
 
 
-@app.get("/api/scan/{scan_id}/download")
-async def download_patch(scan_id: str):
-    """Download the patched sandbox as a ZIP file."""
-    sandbox_dir = demo_site_path / "sandbox" / scan_id
-    if not sandbox_dir.exists():
-        raise HTTPException(status_code=404, detail="Sandbox not available for download")
+@app.get("/api/scan/{scan_id}/diff")
+@app.get("/api/scan/{scan_id}/diff/all")
+async def get_scan_diff(scan_id: str):
+    """Get the full before/after DOM diff for a scan."""
+    safe_id = _sanitize_session_id(scan_id)
+    scan = orchestrator.get_scan(safe_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
 
-    import tempfile
-    zip_path = Path(tempfile.gettempdir()) / f"aura-patch-{scan_id}"
-    try:
-        shutil.make_archive(str(zip_path), 'zip', str(sandbox_dir))
-        return FileResponse(
-            str(zip_path) + ".zip",
-            media_type="application/zip",
-            filename=f"AURA-Patch-{scan_id}.zip",
+    before_html = ""
+    after_html = ""
+    for base_dir in [demo_site_path, Path(__file__).resolve().parent / "demo-site", Path(__file__).resolve().parent.parent / "demo-site"]:
+        s_dir = base_dir / "sandbox" / safe_id
+        if (s_dir / "before.html").exists():
+            before_html = (s_dir / "before.html").read_text(encoding="utf-8", errors="ignore")
+        if (s_dir / "after.html").exists():
+            after_html = (s_dir / "after.html").read_text(encoding="utf-8", errors="ignore")
+        elif (s_dir / "index.html").exists():
+            after_html = (s_dir / "index.html").read_text(encoding="utf-8", errors="ignore")
+        if before_html and after_html:
+            break
+
+    if not before_html or not after_html:
+        diffs = [i.dom_diff for i in scan.issues if i.dom_diff]
+        if diffs:
+            return {"diff": "\n\n".join(diffs), "has_diff": True}
+        return {"diff": "No diff available — fixes not yet applied.", "has_diff": False}
+
+    diff_lines = list(difflib.unified_diff(
+        before_html.splitlines(keepends=True),
+        after_html.splitlines(keepends=True),
+        fromfile="before.html",
+        tofile="after.html",
+        lineterm="",
+    ))
+    return {"diff": "\n".join(diff_lines), "has_diff": len(diff_lines) > 0}
+
+
+def _sanitize_session_id(session_id: str) -> str:
+    cleaned = re.sub(r'[^a-zA-Z0-9_\-]', '', session_id)
+    if not cleaned or cleaned != session_id:
+        raise HTTPException(status_code=400, detail="Invalid session identifier")
+    return cleaned
+
+
+@app.get("/api/scan/{scan_id}/download")
+@app.get("/api/scan/{scan_id}/export/website")
+@app.get("/api/remediation/{scan_id}/export/website")
+async def export_fixed_website(scan_id: str, background_tasks: BackgroundTasks):
+    """Download the complete client-accessible remediated website as a ZIP file."""
+    safe_id = _sanitize_session_id(scan_id)
+    scan = orchestrator.get_scan(safe_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail=f"Scan session '{safe_id}' not found")
+
+    has_remediation = any(
+        i.status == IssueStatus.FIXED or (i.verification and i.verification.status == VerificationStatus.VERIFIED)
+        for i in scan.issues
+    ) or get_sandbox_html_for_scan(safe_id) is not None
+
+    if not has_remediation:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No verified remediation found for session '{safe_id}'. Run remediation first before exporting."
         )
+
+    try:
+        archive_path = generate_fixed_website_archive(scan, safe_id)
+        if not archive_path.exists() or archive_path.stat().st_size == 0:
+            raise HTTPException(status_code=500, detail="Generated export archive is empty")
+
+        # Safely remove temporary zip file after client finishes downloading
+        background_tasks.add_task(os.remove, str(archive_path))
+        return FileResponse(
+            str(archive_path),
+            media_type="application/zip",
+            filename=f"aura-fixed-website-{safe_id}.zip",
+        )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create archive: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate website export: {str(e)}")
+
+
+@app.get("/api/scan/{scan_id}/export/pack")
+@app.get("/api/scan/{scan_id}/export/fixpack")
+@app.get("/api/scan/{scan_id}/download/fix-pack")
+@app.get("/api/scan/{scan_id}/export/fix-pack")
+@app.get("/api/remediation/{scan_id}/export/fix-pack")
+async def export_fix_pack(scan_id: str, background_tasks: BackgroundTasks):
+    """Download developer Fix Pack (git patches, changes.json, verification.json, README) as a ZIP."""
+    safe_id = _sanitize_session_id(scan_id)
+    scan = orchestrator.get_scan(safe_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail=f"Scan session '{safe_id}' not found")
+
+    has_verified = any(
+        i.status == IssueStatus.FIXED or (i.verification and i.verification.status == VerificationStatus.VERIFIED)
+        for i in scan.issues
+    )
+    if not has_verified:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No verified fixes found for session '{safe_id}'. Apply and verify fixes before downloading Fix Pack."
+        )
+
+    try:
+        archive_path = generate_fix_pack_archive(scan, safe_id)
+        if not archive_path.exists() or archive_path.stat().st_size == 0:
+            raise HTTPException(status_code=500, detail="Generated fix pack archive is empty")
+
+        # Safely remove temporary zip file after client finishes downloading
+        background_tasks.add_task(os.remove, str(archive_path))
+        return FileResponse(
+            str(archive_path),
+            media_type="application/zip",
+            filename=f"aura-fix-pack-{safe_id}.zip",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate fix pack: {str(e)}")
+
+
+@app.get("/api/scan/{scan_id}/download")
+@app.get("/api/remediation/{scan_id}/download")
+async def download_patch(scan_id: str, background_tasks: BackgroundTasks):
+    """Download verified export (backwards-compatible alias for website export)."""
+    return await export_fixed_website(scan_id, background_tasks)
 
 
 @app.get("/api/scan/{scan_id}/report/download")
-async def download_report(scan_id: str):
-    """Generate and download a markdown report."""
-    report = orchestrator.generate_report(scan_id)
-    if not report:
-        raise HTTPException(status_code=404, detail="Scan not found")
+@app.get("/api/remediation/{scan_id}/report/download")
+async def download_report(scan_id: str, background_tasks: BackgroundTasks):
+    """Generate and download comprehensive markdown audit report."""
+    safe_id = _sanitize_session_id(scan_id)
+    scan = orchestrator.get_scan(safe_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail=f"Scan session '{safe_id}' not found")
 
-    scan = orchestrator.get_scan(scan_id)
-
-    md = f"""# AURA Accessibility Remediation Report
-
-**Scan ID:** {report['scan_id']}
-**URL:** {report['url']}
-**Timestamp:** {report['scan_timestamp']}
-
----
-
-## Summary
-
-| Metric | Count |
-|--------|-------|
-| Total Issues | {report['total_issues']} |
-| Critical | {report['issues_by_severity'].get('critical', 0)} |
-| Serious | {report['issues_by_severity'].get('serious', 0)} |
-| Moderate | {report['issues_by_severity'].get('moderate', 0)} |
-| Minor | {report['issues_by_severity'].get('minor', 0)} |
-| Fixed | {report['issues_fixed']} |
-| Unresolved | {report['issues_unresolved']} |
-| Needs Review | {report['issues_needs_review']} |
-
-## WCAG Criteria Mapping
-
-"""
-    for criterion, rules in report.get('wcag_mappings', {}).items():
-        md += f"- **WCAG {criterion}**: {', '.join(rules)}\n"
-
-    md += "\n## Fixes Applied\n\n"
-    md += "| Issue | Rule | Strategy | Status |\n"
-    md += "|-------|------|----------|--------|\n"
-    for fix in report.get('fixes_applied', []):
-        md += f"| {fix['issue_id']} | {fix['rule']} | {fix['strategy']} | {fix['verification_status']} |\n"
-
-    if scan and scan.issues:
-        md += "\n## Issue Details\n\n"
-        for issue in scan.issues:
-            md += f"### {issue.rule_id} ({issue.severity.value})\n\n"
-            md += f"- **Status:** {issue.status.value}\n"
-            md += f"- **Selector:** `{issue.element_selector}`\n"
-            md += f"- **Description:** {issue.description}\n"
-            if issue.fix_plan:
-                md += f"- **Fix Strategy:** {issue.fix_plan.strategy}\n"
-                md += f"- **Fix Reason:** {issue.fix_plan.reason}\n"
-            if issue.verification:
-                md += f"- **Verification:** {issue.verification.status.value}\n"
-                md += f"- **Details:** {issue.verification.details}\n"
-            md += "\n"
-
-    md += f"""\n## Limitations
-
-"""
-    for lim in report.get('limitations', []):
-        md += f"- {lim}\n"
-
-    md += "\n---\n*Generated by AURA — Autonomous UI Remediation Agent*\n"
-
+    report_md = generate_comprehensive_audit_report(scan, safe_id)
     import tempfile
-    report_path = Path(tempfile.gettempdir()) / f"AURA-Report-{scan_id}.md"
-    with open(report_path, "w", encoding="utf-8") as f:
-        f.write(md)
+    report_path = Path(tempfile.gettempdir()) / f"AURA-Audit-Report-{safe_id}.md"
+    report_path.write_text(report_md, encoding="utf-8")
 
+    background_tasks.add_task(os.remove, str(report_path))
     return FileResponse(
         str(report_path),
         media_type="text/markdown",
-        filename=f"AURA-Report-{scan_id}.md",
+        filename=f"AURA-Audit-Report-{safe_id}.md",
     )
+
+
+@app.post("/api/scan/{scan_id}/github/pr")
+async def create_github_pr(scan_id: str, req: GitHubPRRequest):
+    """Create or preview GitHub Pull Request with verified remediation changes."""
+    scan = orchestrator.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    result = await create_or_preview_github_pr(
+        scan=scan,
+        scan_id=scan_id,
+        repo=req.repo,
+        token=req.token,
+        base_branch=req.base_branch or "main",
+    )
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error", "GitHub PR creation failed"))
+    return result
+
+
+@app.get("/api/scan/{scan_id}/github/status")
+async def get_github_status(scan_id: str):
+    """Check readiness for GitHub Pull Request creation."""
+    scan = orchestrator.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    verified_count = sum(
+        1 for i in scan.issues
+        if i.status.value == "fixed" or (i.verification and i.verification.status.value == "verified")
+    )
+    return {
+        "scan_id": scan_id,
+        "can_create_pr": verified_count > 0,
+        "verified_count": verified_count,
+        "suggested_branch": f"aura/remediation/{scan_id[:8]}",
+        "requires_verification": verified_count == 0,
+    }
 
 
 @app.get("/api/health")
 async def health():
-    """Health check endpoint."""
+    """Health check endpoint with full subsystem status."""
     return {
         "status": "ok",
-        "service": "AURA",
-        "api": "online",
-        "browser_engine": "ready",
-        "database": "sqlite_ready",
+        "service": "AURA Autonomous UI Remediation Engine",
+        "api": "Operational",
+        "browser_engine": "Operational",
+        "analysis_engine": "Operational",
+        "preview_engine": "Operational",
+        "remediation_engine": "Operational",
+        "storage": "Operational",
+        "environment": "production" if os.getenv("RENDER_EXTERNAL_URL") or os.getenv("RENDER") else "development",
     }
 
 

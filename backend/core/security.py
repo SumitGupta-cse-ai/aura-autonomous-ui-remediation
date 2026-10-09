@@ -39,23 +39,28 @@ def extract_demo_filename(url: str) -> Optional[str]:
     if not url:
         return None
     cleaned = url.strip()
-    # Patterns: demo:demo1, demo/demo1, demo:demo1.html
-    m = re.match(r"^demo[:/](demo[123]|full_remediation|index)(?:\.html)?$", cleaned, re.I)
+    # Patterns: demo:demo1, demo/demo1, demo:demo1.html, demo:clean_site
+    m = re.match(r"^demo[:/](demo[123]|full_remediation|clean_site|clean|index)(?:\.html)?$", cleaned, re.I)
     if m:
-        return f"{m.group(1).lower()}.html"
+        name = m.group(1).lower()
+        if name == "clean":
+            return "clean_site.html"
+        return f"{name}.html"
     # Bare demo identifiers
     lower = cleaned.lower()
-    if lower in ("demo1", "demo2", "demo3", "full_remediation", "index"):
+    if lower in ("demo1", "demo2", "demo3", "full_remediation", "clean_site", "clean", "index"):
+        if lower == "clean":
+            return "clean_site.html"
         return f"{lower}.html"
-    if lower in ("demo1.html", "demo2.html", "demo3.html", "full_remediation.html", "index.html"):
+    if lower in ("demo1.html", "demo2.html", "demo3.html", "full_remediation.html", "clean_site.html", "index.html"):
         return lower
     # URLs or relative paths containing demo-site
     if "demo-site" in lower:
         part = lower.split("demo-site")[-1].lstrip("/\\")
         filename = part.split("?")[0].split("#")[0]
-        if filename in ("demo1.html", "demo2.html", "demo3.html", "full_remediation.html", "index.html"):
+        if filename in ("demo1.html", "demo2.html", "demo3.html", "full_remediation.html", "clean_site.html", "index.html"):
             return filename
-        if filename in ("demo1", "demo2", "demo3", "full_remediation", "index"):
+        if filename in ("demo1", "demo2", "demo3", "full_remediation", "clean_site", "index"):
             return f"{filename}.html"
     return None
 
@@ -72,9 +77,17 @@ def validate_url(url: str) -> Tuple[bool, str]:
     if demo_file:
         return True, f"demo-site/{demo_file}"
 
+    # Check for non-HTTP/HTTPS schemes first (ftp, file, javascript, data, etc.)
+    if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", url):
+        if not url.lower().startswith(("http://", "https://")):
+            return False, "Only HTTP and HTTPS URLs are allowed"
+
     # Must have scheme
     if not url.startswith(("http://", "https://")):
-        url = "https://" + url
+        if url.startswith(("localhost", "127.0.0.1")):
+            url = "http://" + url
+        else:
+            url = "https://" + url
 
     try:
         parsed = urlparse(url)

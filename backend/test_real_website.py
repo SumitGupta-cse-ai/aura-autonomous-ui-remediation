@@ -23,18 +23,26 @@ def test_url(base: str, url: str, label: str):
         return
 
     # 2. Wait for scan to complete
-    max_wait = 30
+    max_wait = 40
     for i in range(max_wait):
         time.sleep(1)
         try:
             scan = httpx.get(f"{base}/api/scan/{scan_id}", timeout=10.0).json()
             status = scan.get("status", "")
-            if status in ("complete", "error"):
+            if status in ("complete", "completed_with_warnings", "partial_analysis", "target_access_restricted", "login_required", "failed", "error"):
                 break
         except Exception:
             continue
 
     print(f"[TEST] Scan status: {scan.get('status')}")
+
+    # Log WebsiteDocument and CompletenessReport
+    doc = scan.get("website_document")
+    if doc:
+        print(f"[TEST] WebsiteDocument: Framework={doc.get('framework_detected')}, Elements={doc.get('elements_count')}, Forms={doc.get('forms_count')}, Buttons={doc.get('buttons_count')}")
+    comp = scan.get("completeness_report")
+    if comp:
+        print(f"[TEST] Completeness: {comp.get('completeness_percentage')}% ({comp.get('status')}), Completed={len(comp.get('checks_completed', []))}, Unavailable={len(comp.get('checks_unavailable', []))}")
 
     # 3. Report issues
     issues = scan.get("issues", [])
@@ -49,7 +57,7 @@ def test_url(base: str, url: str, label: str):
         return
 
     for idx, issue in enumerate(issues[:10], 1):
-        print(f"  Issue {idx}: {issue['rule_id']} | Selector: {issue.get('element_selector', '')[:60]} | Severity: {issue.get('severity', '')}")
+        print(f"  Issue {idx}: {issue['rule_id']} | Class: {issue.get('fix_classification')} | Fixability: {issue.get('fixability_score')}% | Retryable: {issue.get('is_retryable')} | Selector: {issue.get('element_selector', '')[:40]}")
 
     # 4. Attempt to fix the FIRST issue
     first_issue = issues[0]

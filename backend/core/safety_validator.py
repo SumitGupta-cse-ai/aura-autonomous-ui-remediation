@@ -10,23 +10,31 @@ ALLOWED_ATTRIBUTES = {
     "alt", "aria-label", "aria-labelledby", "aria-describedby",
     "aria-hidden", "aria-expanded", "aria-haspopup", "aria-controls",
     "aria-live", "aria-atomic", "aria-relevant", "aria-busy",
+    "aria-roledescription", "aria-details",
     "role", "lang", "title", "for", "id", "type", "name",
-    "placeholder", "tabindex", "scope", "headers",
+    "placeholder", "tabindex", "scope", "headers", "src",
+    "content", "target", "rel", "loading", "accesskey", "charset",
 }
 
 # Allowed strategies
 ALLOWED_STRATEGIES = {
     "add_attribute", "modify_attribute", "remove_attribute",
     "add_element", "modify_element", "add_style", "modify_style",
-    "wrap_element", "set_text_content", "modify_tag",
+    "wrap_element", "set_text_content", "modify_tag", "inject_style",
 }
 
 # Allowed CSS properties
 ALLOWED_CSS_PROPERTIES = {
-    "color", "background-color", "outline", "outline-offset",
+    "color", "background-color", "background", "outline", "outline-offset",
     "outline-style", "outline-width", "outline-color",
-    "border", "border-color", "font-size", "font-weight",
+    "border", "border-color", "border-radius", "border-width", "border-style",
+    "border-top", "border-bottom", "border-left", "border-right",
+    "font-size", "font-weight", "font-family", "line-height", "letter-spacing",
     "text-decoration", "opacity", "visibility", "display",
+    "height", "min-height", "max-height",
+    "padding", "padding-top", "padding-bottom", "padding-left", "padding-right",
+    "margin", "margin-top", "margin-bottom", "margin-left", "margin-right",
+    "gap", "row-gap", "column-gap", "box-shadow", "box-sizing", "transition", "cursor",
 }
 
 # Blocked patterns in any value
@@ -107,7 +115,7 @@ def _validate_change(change: FixChange, strategy: str) -> List[str]:
 
     if strategy == "add_element":
         if change.tag:
-            allowed_tags = {"label", "span", "div", "a", "h1", "h2", "h3", "h4", "h5", "h6"}
+            allowed_tags = {"label", "span", "div", "a", "h1", "h2", "h3", "h4", "h5", "h6", "meta", "style", "p", "section", "title"}
             if change.tag.lower() not in allowed_tags:
                 errors.append(f"Element tag '{change.tag}' is not allowed")
 

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+<!-- INTENTIONALLY MISSING lang ATTRIBUTE — WCAG 3.1.1 violation -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GreenField Farms — Fresh Organic Produce</title>
+    <style>
+        /* ===== Reset & Base ===== */
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #f8faf5;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        /* INTENTIONAL: Remove focus outlines — WCAG 2.4.7 violation */
+        *:focus { outline: none; }
+
+        /* ===== Demo Banner ===== */
+        .demo-banner {
+            background: #2d2d2d;
+            color: #fbbf24;
+            text-align: center;
+            padding: 8px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        /* ===== Navigation ===== */
+        nav {
+            background: #ffffff;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 16px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .nav-brand {
+            font-size: 22px;
+            font-weight: 700;
+            color: #166534;
+        }
+        .nav-links { display: flex; gap: 24px; align-items: center; }
+        .nav-links a {
+            text-decoration: none;
+            color: #4b5563;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .nav-links a:hover { color: #166534; }
+
+        /* INTENTIONAL: Button without accessible name — WCAG 4.1.2 violation */
+        .icon-btn {
+            background: none;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            padding: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .icon-btn svg { width: 18px; height: 18px; color: #4b5563; }
+
+        /* ===== Hero ===== */
+        .hero {
+            background: linear-gradient(135deg, #166534, #15803d, #22c55e);
+            color: white;
+            padding: 80px 40px;
+            text-align: center;
+        }
+        .hero h1 { font-size: 48px; font-weight: 800; margin-bottom: 16px; }
+        .hero p { font-size: 18px; opacity: 0.9; max-width: 600px; margin: 0 auto 32px; }
+        .hero-cta {
+            display: inline-block;
+            background: white;
+            color: #166534;
+            padding: 14px 32px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 16px;
+        }
+
+        /* ===== Products ===== */
+        .section { padding: 64px 40px; max-width: 1200px; margin: 0 auto; }
+        .section-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 8px;
+        }
+        .section-subtitle {
+            font-size: 14px;
+            margin-bottom: 40px;
+        }
+        /* INTENTIONAL: Low contrast text — WCAG 1.4.3 violation */
+        .low-contrast {
+            color: #b0b0b0;
+        }
+
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+        .product-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #e5e7eb;
+            transition: box-shadow 0.2s;
+        }
+        .product-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+
+        .product-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            display: block;
+            background: #e8f5e9;
+        }
+        .product-info { padding: 20px; }
+        .product-info h4 { font-size: 18px; color: #111827; margin-bottom: 4px; }
+
+        /* INTENTIONAL: Heading hierarchy skip (h1 → h4) — WCAG 1.3.1 violation */
+
+        .product-info .price { font-size: 20px; font-weight: 700; color: #166534; }
+        .product-info .unit { font-size: 12px; color: #9ca3af; }
+
+        /* ===== Newsletter ===== */
+        .newsletter {
+            background: #f0fdf4;
+            padding: 48px 40px;
+            text-align: center;
+        }
+        .newsletter h4 { font-size: 24px; color: #166534; margin-bottom: 8px; }
+        .newsletter p { color: #6b7280; margin-bottom: 24px; }
+        .newsletter-form {
+            display: flex;
+            gap: 12px;
+            max-width: 480px;
+            margin: 0 auto;
+        }
+        /* INTENTIONAL: Input without label — WCAG 1.3.1 / 4.1.2 violation */
+        .newsletter-form input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .newsletter-form button {
+            background: #166534;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* ===== Footer ===== */
+        footer {
+            background: #1f2937;
+            color: #9ca3af;
+            padding: 40px;
+            text-align: center;
+        }
+        .footer-links { display: flex; justify-content: center; gap: 24px; margin-bottom: 16px; }
+        /* INTENTIONAL: Link with no discernible text — WCAG 4.1.2 / 2.4.4 violation */
+        .footer-links a { color: #9ca3af; text-decoration: none; }
+        .footer-links a:hover { color: white; }
+        .footer-copy { font-size: 12px; }
+    </style>
+</head>
+<body>
+    <!-- Demo Environment Banner -->
+    <div class="demo-banner">
+        ⚠️ AURA Demo Environment — This page contains intentional accessibility issues for testing
+    </div>
+
+    <!-- Navigation -->
+    <nav>
+        <span class="nav-brand">🌿 GreenField Farms</span>
+        <div class="nav-links">
+            <a href="#products">Products</a>
+            <a href="#about">About</a>
+            <a href="#contact">Contact</a>
+            <!-- INTENTIONAL: Button without accessible name (icon only, no aria-label, no text) -->
+            <button class="icon-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <h1>Fresh from the Farm to Your Table</h1>
+        <p>Sustainably grown organic produce delivered weekly. Supporting local agriculture since 2018.</p>
+        <a href="#products" class="hero-cta">Shop Fresh Produce</a>
+    </section>
+
+    <!-- Products Section -->
+    <!-- INTENTIONAL: Heading hierarchy skip — goes from h1 directly to h4 -->
+    <section class="section" id="products">
+        <h4 class="section-title">Our Fresh Products</h4>
+        <!-- INTENTIONAL: Low contrast subtitle — WCAG 1.4.3 violation -->
+        <p class="section-subtitle low-contrast">Farm-fresh organic produce picked at peak ripeness</p>
+
+        <div class="product-grid">
+            <!-- Product 1 -->
+            <div class="product-card">
+                <!-- INTENTIONAL: Image without alt text — WCAG 1.1.1 violation -->
+                <img src="https://placehold.co/400x200/e8f5e9/166534?text=Organic+Tomatoes" class="product-image">
+                <div class="product-info">
+                    <h4>Organic Roma Tomatoes</h4>
+                    <span class="price">$4.99</span>
+                    <span class="unit">per lb</span>
+                </div>
+            </div>
+
+            <!-- Product 2 -->
+            <div class="product-card">
+                <img src="https://placehold.co/400x200/e8f5e9/166534?text=Baby+Spinach" class="product-image" alt="Fresh baby spinach leaves in a wooden bowl">
+                <div class="product-info">
+                    <h4>Baby Spinach</h4>
+                    <span class="price">$3.49</span>
+                    <span class="unit">per bunch</span>
+                </div>
+            </div>
+
+            <!-- Product 3 -->
+            <div class="product-card">
+                <img src="https://placehold.co/400x200/e8f5e9/166534?text=Sweet+Corn" class="product-image" alt="Fresh ears of sweet corn">
+                <div class="product-info">
+                    <h4>Sweet Corn</h4>
+                    <span class="price">$2.99</span>
+                    <span class="unit">per 4 ears</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Newsletter Section -->
+    <section class="newsletter" id="contact">
+        <h4>Get Weekly Harvest Updates</h4>
+        <p>Sign up for our newsletter and never miss a fresh delivery.</p>
+        <form class="newsletter-form" onsubmit="return false;">
+            <!-- INTENTIONAL: Input without label — no <label>, no aria-label -->
+            <input type="email" placeholder="Enter your email address">
+            <button type="submit">Subscribe</button>
+        </form>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-links">
+            <a href="/privacy">Privacy Policy</a>
+            <a href="/terms">Terms of Service</a>
+            <!-- INTENTIONAL: Link wrapping image with no alt, no aria-label — WCAG 4.1.2 / 2.4.4 -->
+            <a href="/social">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M22.46 6c-.85.38-1.78.64-2.73.76 1-.6 1.76-1.54 2.12-2.67-.93.55-1.96.95-3.06 1.17-.88-.94-2.13-1.53-3.51-1.53-2.66 0-4.81 2.16-4.81 4.81 0 .38.04.75.13 1.1-4-.2-7.58-2.11-9.96-5.02-.42.72-.66 1.56-.66 2.46 0 1.68.85 3.16 2.14 4.02-.79-.02-1.53-.24-2.18-.6v.06c0 2.35 1.67 4.31 3.88 4.76-.4.1-.83.16-1.27.16-.31 0-.62-.03-.92-.08.63 1.96 2.45 3.39 4.6 3.43-1.68 1.32-3.81 2.1-6.12 2.1-.4 0-.79-.02-1.17-.07 2.19 1.4 4.78 2.22 7.57 2.22 9.07 0 14.02-7.52 14.02-14.02 0-.21 0-.42-.01-.63.96-.7 1.8-1.56 2.46-2.55z"/>
+                </svg>
+            </a>
+        </div>
+        <p class="footer-copy">&copy; 2024 GreenField Farms. All rights reserved.</p>
+    </footer>
+</body>
+</html>

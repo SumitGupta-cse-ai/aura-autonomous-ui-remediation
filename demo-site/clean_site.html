@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apex Studio — Digital Product Agency</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --secondary: #3b82f6;
+      --bg: #090d16;
+      --surface: #0f172a;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #1e293b;
+    }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5rem 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #ffffff;
+      text-decoration: none;
+    }
+    nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+      margin-left: 1.5rem;
+      font-size: 0.9rem;
+    }
+    nav a:hover, nav a:focus {
+      color: #ffffff;
+      outline: 2px solid var(--secondary);
+    }
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem;
+    }
+    .hero {
+      text-align: center;
+      padding: 3rem 1rem;
+    }
+    h1 {
+      font-size: 2.75rem;
+      color: #ffffff;
+      margin-bottom: 1rem;
+      line-height: 1.2;
+    }
+    .hero p {
+      color: var(--text-muted);
+      font-size: 1.15rem;
+      max-width: 650px;
+      margin: 0 auto 2rem;
+    }
+    .btn {
+      display: inline-block;
+      background-color: var(--primary);
+      color: #ffffff;
+      padding: 0.75rem 1.75rem;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      border: 1px solid var(--primary);
+      cursor: pointer;
+    }
+    .btn:focus {
+      outline: 3px solid #60a5fa;
+      outline-offset: 2px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin-top: 3rem;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+    }
+    .card h2 {
+      font-size: 1.25rem;
+      color: #ffffff;
+      margin-top: 0;
+    }
+    .card p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+    footer {
+      border-top: 1px solid var(--border);
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-top: 4rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="#home" class="logo">Apex Studio</a>
+    <nav aria-label="Main Navigation">
+      <a href="#services">Services</a>
+      <a href="#portfolio">Portfolio</a>
+      <a href="#about">About</a>
+      <a href="#contact">Contact</a>
+    </nav>
+  </header>
+
+  <main id="home">
+    <section class="hero" aria-labelledby="hero-title">
+      <h1 id="hero-title">Crafting Resilient Digital Experiences</h1>
+      <p>We build accessible, high-performance web applications that scale effortlessly for high-growth modern brands.</p>
+      <a href="#services" class="btn">Explore Our Work</a>
+    </section>
+
+    <section id="services" aria-labelledby="services-title">
+      <h2 id="services-title" style="text-align: center; margin-bottom: 1.5rem;">Core Capabilities</h2>
+      <div class="grid">
+        <article class="card">
+          <h2>Product Engineering</h2>
+          <p>Architected with modern web technologies, responsive layouts, and zero technical debt.</p>
+        </article>
+        <article class="card">
+          <h2>Accessibility by Design</h2>
+          <p>WCAG 2.1 AAA compliance baked into every component, color token, and interaction.</p>
+        </article>
+        <article class="card">
+          <h2>Design Systems</h2>
+          <p>Modular tokens and unified design languages that bridge engineering and creative teams.</p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 Apex Studio. All rights reserved. Technically verified accessible.</p>
+  </footer>
+</body>
+</html>

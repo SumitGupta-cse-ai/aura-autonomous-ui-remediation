@@ -106,7 +106,7 @@ export default function ScanPage() {
     setWsConnected(true);
 
     return () => {
-      ws.close();
+      ws?.close();
     };
   }, [scanId, fetchScan]);
 
@@ -167,6 +167,8 @@ export default function ScanPage() {
     fixed: scan?.issues?.filter((i) => i.status === "fixed").length || 0,
     unresolved: scan?.issues?.filter((i) => i.status === "unresolved").length || 0,
     needs_review: scan?.issues?.filter((i) => i.status === "needs_review").length || 0,
+    health_score_initial: 100,
+    health_score_current: 100,
   };
 
   if (error && !scan) {

@@ -88,6 +88,30 @@ export function ReportModal({ report, isOpen, onClose }: ReportModalProps) {
             </div>
           </div>
 
+          {/* Health Score Progression */}
+          <div className="p-4 rounded-xl bg-[#0b1117] border border-[#1e293b] flex items-center justify-between">
+            <div>
+              <span className="text-[10px] text-[#64748b] uppercase tracking-wider font-bold block">
+                Accessibility Health Score
+              </span>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <span className="text-2xl font-extrabold text-emerald-400">
+                  {report.health_score_current ?? 100} / 100
+                </span>
+                {(report.health_score_initial ?? 100) < (report.health_score_current ?? 100) && (
+                  <span className="text-xs text-[#94a3b8]">
+                    (baseline was {report.health_score_initial})
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="px-3 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold">
+              {report.issues_fixed > 0
+                ? `+${(report.health_score_current ?? 100) - (report.health_score_initial ?? 100)} pts gained`
+                : "Baseline WCAG Audit"}
+            </div>
+          </div>
+
           {/* Overview Grid */}
           <div className="grid grid-cols-4 gap-3 text-center">
             <div className="p-3 rounded-xl bg-[#16202c] border border-[#1e293b]">

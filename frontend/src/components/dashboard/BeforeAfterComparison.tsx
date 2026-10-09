@@ -18,8 +18,36 @@ import {
   ShieldCheck,
   AlertTriangle,
   ArrowRight,
+  GitPullRequest,
+  FolderArchive,
+  PackageCheck,
+  RotateCcw,
+  RefreshCw,
+  Globe,
+  Sliders,
+  Layers,
+  History,
+  BarChart3,
 } from "lucide-react";
-import { getSandboxUrl, getDownloadPatchUrl, getDownloadReportUrl } from "@/lib/api";
+import {
+  getSandboxUrl,
+  getSandboxBeforeUrl,
+  getSandboxAfterUrl,
+  getSandboxShowChangesUrl,
+  getVersionHistory,
+  restoreVersion,
+  getHealthScores,
+  getDownloadPatchUrl,
+  getDownloadReportUrl,
+  getOriginalWebsiteUrl,
+  getExportWebsiteUrl,
+  getExportFixPackUrl,
+  downloadFixedWebsite,
+  downloadFixPack,
+  downloadAuditReport,
+} from "@/lib/api";
+import type { VersionHistoryItem, EightDimensionScores } from "@/lib/types";
+import { GitHubPRModal } from "./GitHubPRModal";
 
 interface BeforeAfterComparisonProps {
   selectedIssue: AccessibilityIssue | null;
@@ -27,7 +55,11 @@ interface BeforeAfterComparisonProps {
   onViewReport?: () => void;
   scanId?: string;
   targetUrl?: string;
+  originalUrl?: string;
   isFixing?: boolean;
+  issues?: AccessibilityIssue[];
+  onRollback?: () => Promise<void> | void;
+  isRollingBack?: boolean;
 }
 
 function getSafeImageSrc(src?: string): string {
@@ -44,11 +76,110 @@ export function BeforeAfterComparison({
   onViewReport,
   scanId,
   targetUrl,
+  originalUrl,
   isFixing,
+  issues,
+  onRollback,
+  isRollingBack,
 }: BeforeAfterComparisonProps) {
-  const [viewMode, setViewMode] = useState<"screenshot" | "diff">("screenshot");
+  const canonicalOriginalUrl = getOriginalWebsiteUrl(originalUrl || targetUrl);
+  const [viewMode, setViewMode] = useState<"screenshot" | "sandbox" | "diff">("screenshot");
+  const [sandboxViewTab, setSandboxViewTab] = useState<
+    "split" | "slider" | "overlay" | "before" | "after" | "show-changes"
+  >("split");
+  const [sliderPos, setSliderPos] = useState(50);
+  const [overlayOpacity, setOverlayOpacity] = useState(50);
+  const [versions, setVersions] = useState<VersionHistoryItem[]>([]);
+  const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
+  const [isRestoringVersion, setIsRestoringVersion] = useState(false);
+  const [healthScores, setHealthScores] = useState<EightDimensionScores | null>(null);
+  const [showHealthModal, setShowHealthModal] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [viewport, setViewport] = useState<"desktop" | "tablet" | "mobile">("desktop");
   const [copied, setCopied] = useState(false);
   const [zoomImage, setZoomImage] = useState<{ src: string; title: string; subtitle: string; isFixed: boolean } | null>(null);
+  const [isGitHubModalOpen, setIsGitHubModalOpen] = useState(false);
+  const [isDownloadingWebsite, setIsDownloadingWebsite] = useState(false);
+  const [isDownloadingFixPack, setIsDownloadingFixPack] = useState(false);
+  const [isDownloadingReport, setIsDownloadingReport] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  const handleDownloadWebsite = async () => {
+    if (!scanId || isDownloadingWebsite) return;
+    setIsDownloadingWebsite(true);
+    setDownloadError(null);
+    try {
+      const res = await downloadFixedWebsite(scanId);
+      if (!res.success) {
+        setDownloadError(res.error || "Failed to download Fixed Website archive.");
+      }
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : "Download failed.");
+    } finally {
+      setIsDownloadingWebsite(false);
+    }
+  };
+
+  const handleDownloadFixPack = async () => {
+    if (!scanId || isDownloadingFixPack) return;
+    setIsDownloadingFixPack(true);
+    setDownloadError(null);
+    try {
+      const res = await downloadFixPack(scanId);
+      if (!res.success) {
+        setDownloadError(res.error || "Failed to download Fix Pack.");
+      }
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : "Download failed.");
+    } finally {
+      setIsDownloadingFixPack(false);
+    }
+  };
+
+  const handleDownloadReport = async () => {
+    if (!scanId || isDownloadingReport) return;
+    setIsDownloadingReport(true);
+    setDownloadError(null);
+    try {
+      const res = await downloadAuditReport(scanId);
+      if (!res.success) {
+        setDownloadError(res.error || "Failed to download audit report.");
+      }
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : "Download failed.");
+    } finally {
+      setIsDownloadingReport(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (scanId) {
+      getVersionHistory(scanId)
+        .then((res) => {
+          if (Array.isArray(res)) setVersions(res);
+        })
+        .catch(() => {});
+      getHealthScores(scanId)
+        .then((res) => {
+          if (res) setHealthScores(res);
+        })
+        .catch(() => {});
+    }
+  }, [scanId, refreshKey]);
+
+  const handleRestoreVersionAction = async (vIndex: number) => {
+    if (!scanId || isRestoringVersion) return;
+    setIsRestoringVersion(true);
+    try {
+      await restoreVersion(scanId, vIndex);
+      setSelectedVersion(vIndex);
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      console.error("Failed to restore version:", err);
+    } finally {
+      setIsRestoringVersion(false);
+    }
+  };
 
   if (!selectedIssue) {
     return (
@@ -127,11 +258,18 @@ export function BeforeAfterComparison({
   }
 
   const isVerified = selectedIssue.status === "fixed" || selectedIssue.verification?.status === "verified";
+  const verifiedCount = issues
+    ? issues.filter((i) => i.status === "fixed" || i.verification?.status === "verified").length
+    : isVerified
+    ? 1
+    : 0;
+  const manualReviewCount = issues?.filter((i) => i.status === "needs_review").length || 0;
+  const unresolvedCount = issues?.filter((i) => i.status === "unresolved").length || 0;
 
   return (
-    <div className="bg-[#0f1720] border border-[#1e293b] rounded-xl flex flex-col h-full overflow-hidden shadow-xl" id="report-section">
+    <div className="bg-[#0f1720] border border-[#1e293b] rounded-xl flex flex-col h-full min-h-0 overflow-hidden shadow-xl" id="report-section">
       {/* Header */}
-      <div className="p-4 border-b border-[#1e293b] flex items-center justify-between">
+      <div className="p-3.5 border-b border-[#1e293b] flex items-center justify-between flex-shrink-0 bg-[#0f1720]">
         <div className="flex items-center gap-2">
           <Eye className="w-4 h-4 text-emerald-400" />
           <h3 className="text-sm font-bold text-white uppercase tracking-wider">
@@ -142,35 +280,190 @@ export function BeforeAfterComparison({
           </span>
         </div>
 
-        {/* View Mode Toggle */}
-        <div className="flex items-center gap-1 bg-[#16202c] p-1 rounded-lg border border-[#1e293b]">
+        {/* View Mode & Responsive Viewport Toggles */}
+        <div className="flex items-center gap-2">
+          {/* Responsive Viewport Selector */}
+          <div className="hidden sm:flex items-center gap-1 bg-[#16202c] p-1 rounded-lg border border-[#1e293b]">
+            <button
+              onClick={() => setViewport("desktop")}
+              className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all ${
+                viewport === "desktop"
+                  ? "bg-blue-500/20 text-blue-400 border border-blue-500/30 shadow-sm"
+                  : "text-[#94a3b8] hover:text-white"
+              }`}
+              title="Desktop Viewport (1280px)"
+            >
+              Desktop
+            </button>
+            <button
+              onClick={() => setViewport("tablet")}
+              className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all ${
+                viewport === "tablet"
+                  ? "bg-blue-500/20 text-blue-400 border border-blue-500/30 shadow-sm"
+                  : "text-[#94a3b8] hover:text-white"
+              }`}
+              title="Tablet Viewport (768px)"
+            >
+              Tablet
+            </button>
+            <button
+              onClick={() => setViewport("mobile")}
+              className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all ${
+                viewport === "mobile"
+                  ? "bg-blue-500/20 text-blue-400 border border-blue-500/30 shadow-sm"
+                  : "text-[#94a3b8] hover:text-white"
+              }`}
+              title="Mobile Viewport (375px)"
+            >
+              Mobile
+            </button>
+          </div>
+
+          {/* View Mode Toggle */}
+          <div className="flex items-center gap-1 bg-[#16202c] p-1 rounded-lg border border-[#1e293b]">
+            <button
+              onClick={() => setViewMode("screenshot")}
+              className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all flex items-center gap-1 ${
+                viewMode === "screenshot"
+                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm"
+                  : "text-[#94a3b8] hover:text-white"
+              }`}
+            >
+              <Eye className="w-3 h-3" />
+              <span>Screenshot</span>
+            </button>
+            <button
+              onClick={() => setViewMode("sandbox")}
+              className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all flex items-center gap-1 ${
+                viewMode === "sandbox"
+                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm"
+                  : "text-[#94a3b8] hover:text-white"
+              }`}
+            >
+              <Globe className="w-3 h-3" />
+              <span>Sandbox</span>
+            </button>
+            <button
+              onClick={() => setViewMode("diff")}
+              className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all flex items-center gap-1 ${
+                viewMode === "diff"
+                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm"
+                  : "text-[#94a3b8] hover:text-white"
+              }`}
+            >
+              <Code className="w-3 h-3" />
+              <span>DOM Diff</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Primary Action Buttons & Version Switcher Bar */}
+      <div className="px-4 py-2.5 bg-[#0b131e] border-b border-[#1e293b] flex flex-wrap items-center justify-between gap-2.5 flex-shrink-0">
+        {/* Left: Primary 3 Action Buttons */}
+        <div className="flex items-center gap-2">
+          {/* [ Original Website ] */}
+          <a
+            href={scanId ? getSandboxBeforeUrl(scanId) : (canonicalOriginalUrl || "#")}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => {
+              setViewMode("sandbox");
+              setSandboxViewTab("before");
+            }}
+            className="px-3 py-1.5 bg-[#16202c] hover:bg-[#1e2d3d] border border-amber-500/40 text-amber-300 font-semibold text-xs rounded-lg transition-all flex items-center gap-1.5 shadow-sm"
+            title="Open Original Website (v1)"
+          >
+            <Globe className="w-3.5 h-3.5 text-amber-400" />
+            <span>Original Website</span>
+            <ExternalLink className="w-3 h-3 text-amber-400/70" />
+          </a>
+
+          {/* [ Improved Website ] */}
+          <a
+            href={scanId ? getSandboxAfterUrl(scanId) : "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => {
+              setViewMode("sandbox");
+              setSandboxViewTab("after");
+            }}
+            className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-semibold text-xs rounded-lg transition-all flex items-center gap-1.5 shadow-sm"
+            title="Open Improved Remediated Website (v2)"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Improved Website</span>
+            <ExternalLink className="w-3 h-3 text-emerald-400/70" />
+          </a>
+
+          {/* [ Compare ] */}
           <button
-            onClick={() => setViewMode("screenshot")}
-            className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all flex items-center gap-1 ${
-              viewMode === "screenshot"
-                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm"
+            onClick={() => {
+              setViewMode("sandbox");
+              setSandboxViewTab("split");
+            }}
+            className={`px-3 py-1.5 border text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 shadow-sm cursor-pointer ${
+              viewMode === "sandbox" && sandboxViewTab === "split"
+                ? "bg-blue-600 text-white border-blue-500 shadow-blue-500/20"
+                : "bg-[#16202c] hover:bg-[#1e2d3d] border-blue-500/30 text-blue-300"
+            }`}
+            title="Launch Split Comparison Sandbox"
+          >
+            <Layers className="w-3.5 h-3.5 text-blue-400" />
+            <span>Compare</span>
+          </button>
+        </div>
+
+        {/* Right: Version Switcher */}
+        <div className="flex items-center gap-1 bg-[#16202c] p-1 rounded-lg border border-[#1e293b]">
+          <span className="text-[10px] text-[#64748b] uppercase tracking-wider font-bold px-1.5">Version:</span>
+          <button
+            onClick={() => {
+              setViewMode("sandbox");
+              setSandboxViewTab("before");
+            }}
+            className={`px-2 py-1 rounded text-[11px] font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+              viewMode === "sandbox" && sandboxViewTab === "before"
+                ? "bg-amber-500/20 text-amber-400 border border-amber-500/40 shadow-xs"
                 : "text-[#94a3b8] hover:text-white"
             }`}
+            title="Original Untouched Baseline (v1)"
           >
-            <Eye className="w-3 h-3" />
-            <span>Screenshot</span>
+            <span>Original (v1)</span>
           </button>
           <button
-            onClick={() => setViewMode("diff")}
-            className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all flex items-center gap-1 ${
-              viewMode === "diff"
-                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm"
+            onClick={() => {
+              setViewMode("sandbox");
+              setSandboxViewTab("split");
+            }}
+            className={`px-2 py-1 rounded text-[11px] font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+              viewMode === "sandbox" && sandboxViewTab === "split"
+                ? "bg-purple-500/20 text-purple-400 border border-purple-500/40 shadow-xs"
                 : "text-[#94a3b8] hover:text-white"
             }`}
+            title="Interactive Comparison Preview (v1-preview)"
           >
-            <Code className="w-3 h-3" />
-            <span>DOM Diff</span>
+            <span>Preview (v1-preview)</span>
+          </button>
+          <button
+            onClick={() => {
+              setViewMode("sandbox");
+              setSandboxViewTab("after");
+            }}
+            className={`px-2 py-1 rounded text-[11px] font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+              viewMode === "sandbox" && sandboxViewTab === "after"
+                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-xs"
+                : "text-[#94a3b8] hover:text-white"
+            }`}
+            title="Remediated Production-Grade Website (v2)"
+          >
+            <span>Improved (v2)</span>
           </button>
         </div>
       </div>
 
       {/* Main Comparison Area */}
-      <div className="p-4 flex-1 overflow-y-auto space-y-4">
+      <div className="p-4 flex-1 min-h-0 overflow-y-auto space-y-4 scrollbar-thin">
         {/* Live Remediation Indicator */}
         {isFixing ? (
           <div className="bg-blue-500/15 border border-blue-500/40 rounded-xl p-3 flex items-center gap-3 animate-pulse">
@@ -332,9 +625,10 @@ export function BeforeAfterComparison({
                   </>
                 ) : isVerified && scanId ? (
                   <iframe
-                    src={getSandboxUrl(scanId)}
+                    key={`after-thumb-${refreshKey}`}
+                    src={`${getSandboxAfterUrl(scanId)}?k=${refreshKey}`}
                     title="Patched Sandbox Preview"
-                    className="w-full h-full border-0 transform scale-75 origin-top-left pointer-events-none"
+                    className="w-full h-full border-0 transform scale-75 origin-top-left pointer-events-none bg-white rounded"
                     style={{ width: "133.33%", height: "133.33%" }}
                   />
                 ) : (
@@ -368,6 +662,442 @@ export function BeforeAfterComparison({
             </div>
           </div>
         ) : null}
+
+        {/* ─── LIVE INTERACTIVE SANDBOX VIEW ─── */}
+        {viewMode === "sandbox" && (
+          <div className="space-y-3">
+            {/* Sandbox Controls Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-[#0b1117] border border-[#1e293b] p-2 rounded-xl">
+              <div className="flex items-center gap-1.5 overflow-x-auto">
+                <button
+                  onClick={() => setSandboxViewTab("split")}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                    sandboxViewTab === "split"
+                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-xs"
+                      : "text-[#94a3b8] hover:text-white"
+                  }`}
+                >
+                  Split View
+                </button>
+                <button
+                  onClick={() => setSandboxViewTab("slider")}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1 ${
+                    sandboxViewTab === "slider"
+                      ? "bg-blue-500/20 text-blue-300 border border-blue-500/30 shadow-xs"
+                      : "text-[#94a3b8] hover:text-white"
+                  }`}
+                >
+                  <Sliders className="w-3 h-3 text-blue-400" />
+                  <span>[ SLIDER ]</span>
+                </button>
+                <button
+                  onClick={() => setSandboxViewTab("overlay")}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1 ${
+                    sandboxViewTab === "overlay"
+                      ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shadow-xs"
+                      : "text-[#94a3b8] hover:text-white"
+                  }`}
+                >
+                  <Layers className="w-3 h-3 text-indigo-400" />
+                  <span>[ OVERLAY ]</span>
+                </button>
+                <button
+                  onClick={() => setSandboxViewTab("show-changes")}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1 ${
+                    sandboxViewTab === "show-changes"
+                      ? "bg-purple-500/20 text-purple-300 border border-purple-500/30 shadow-xs"
+                      : "text-[#94a3b8] hover:text-white"
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3 text-purple-400" />
+                  <span>[ SHOW CHANGES ]</span>
+                </button>
+                <button
+                  onClick={() => setSandboxViewTab("before")}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                    sandboxViewTab === "before"
+                      ? "bg-red-500/20 text-red-300 border border-red-500/30 shadow-xs"
+                      : "text-[#94a3b8] hover:text-white"
+                  }`}
+                >
+                  [ BEFORE ]
+                </button>
+                <button
+                  onClick={() => setSandboxViewTab("after")}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                    sandboxViewTab === "after"
+                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-xs"
+                      : "text-[#94a3b8] hover:text-white"
+                  }`}
+                >
+                  [ AFTER ]
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {/* Version History Selector */}
+                {versions.length > 0 && (
+                  <div className="flex items-center gap-1 bg-[#16202c] px-2 py-0.5 rounded-lg border border-[#1e293b]">
+                    <History className="w-3 h-3 text-blue-400" />
+                    <select
+                      value={selectedVersion ?? (versions.length - 1)}
+                      onChange={(e) => handleRestoreVersionAction(Number(e.target.value))}
+                      disabled={isRestoringVersion}
+                      className="bg-transparent text-[11px] text-[#94a3b8] focus:text-white outline-none font-mono py-0.5 cursor-pointer"
+                    >
+                      {versions.map((v) => (
+                        <option key={v.version} value={v.version} className="bg-[#0b1117] text-white">
+                          v{v.version}: {v.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* 8-Scores Button */}
+                <button
+                  onClick={() => setShowHealthModal(!showHealthModal)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+                    showHealthModal
+                      ? "bg-purple-500/20 text-purple-300 border border-purple-500/40"
+                      : "bg-[#16202c] hover:bg-[#1e2d3d] border border-[#1e293b] text-[#94a3b8]"
+                  }`}
+                  title="Toggle 8-Dimension Quality Scores"
+                >
+                  <BarChart3 className="w-3 h-3 text-purple-400" />
+                  <span>8-Scores</span>
+                </button>
+
+                <button
+                  onClick={() => setRefreshKey((k) => k + 1)}
+                  className="px-2.5 py-1 rounded-lg bg-[#16202c] hover:bg-[#1e2d3d] border border-[#1e293b] text-[#94a3b8] hover:text-white text-[11px] font-medium flex items-center gap-1 transition-all cursor-pointer"
+                  title="Force reload sandbox iframes"
+                >
+                  <RefreshCw className="w-3 h-3 text-emerald-400" />
+                  <span>Refresh</span>
+                </button>
+                {scanId && (
+                  <a
+                    href={getSandboxUrl(scanId)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1 rounded-lg bg-[#16202c] hover:bg-[#1e2d3d] border border-[#1e293b] text-[#94a3b8] hover:text-white text-[11px] font-medium flex items-center gap-1 transition-all"
+                    title="Open live sandbox in new tab"
+                  >
+                    <ExternalLink className="w-3 h-3 text-blue-400" />
+                    <span>Open Tab</span>
+                  </a>
+                )}
+              </div>
+            </div>
+
+            {/* 8-Dimension Quality Scores Summary Banner */}
+            {showHealthModal && healthScores && (
+              <div className="bg-[#121922] border border-purple-500/40 rounded-xl p-3.5 space-y-3 animate-fadeIn">
+                <div className="flex items-center justify-between border-b border-[#1e293b] pb-2">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4 text-purple-400" />
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">
+                      8-Dimension Website Quality Scores (Before vs After)
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-emerald-400 font-mono font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                    {healthScores.verified_fixes} Verified Fixes
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {Object.keys(healthScores.before).map((dim) => {
+                    const beforeVal = healthScores.before[dim] || 50;
+                    const afterVal = healthScores.after[dim] || 85;
+                    const diff = afterVal - beforeVal;
+
+                    return (
+                      <div key={dim} className="bg-[#0b1117] border border-[#1e293b] rounded-lg p-2 text-xs">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-medium text-[#94a3b8] capitalize">
+                            {dim.replace("_", " ")}
+                          </span>
+                          <span className={`text-[10px] font-mono font-bold ${diff > 0 ? "text-emerald-400" : "text-[#64748b]"}`}>
+                            {diff > 0 ? `+${diff}` : `${diff}`}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between font-mono text-[11px] mb-1">
+                          <span className="text-red-400">{beforeVal}</span>
+                          <span className="text-[#64748b]">→</span>
+                          <span className="text-emerald-400 font-bold">{afterVal}</span>
+                        </div>
+                        <div className="w-full bg-[#16202c] h-1 rounded-full overflow-hidden">
+                          <div
+                            className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                            style={{ width: `${afterVal}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Sandbox View Modes Rendering */}
+            {sandboxViewTab === "split" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Before Frame */}
+                <div className="bg-[#0b1117] border border-red-500/30 rounded-xl overflow-hidden flex flex-col shadow-sm">
+                  <div className="p-2 border-b border-[#1e293b] bg-[#12070a] flex items-center justify-between text-xs">
+                    <span className="font-bold text-red-400 flex items-center gap-1.5">
+                      <XCircle className="w-3.5 h-3.5" />
+                      BEFORE (Untouched Snapshot)
+                    </span>
+                    <span className="text-[10px] text-red-300 bg-red-500/20 px-1.5 py-0.2 rounded font-mono">
+                      Original
+                    </span>
+                  </div>
+                  <div className="h-72 sm:h-96 w-full bg-white relative">
+                    <iframe
+                      key={`before-${refreshKey}`}
+                      src={scanId ? `${getSandboxBeforeUrl(scanId)}?k=${refreshKey}` : canonicalOriginalUrl}
+                      title="Untouched Original Website"
+                      className="w-full h-full border-0"
+                      sandbox="allow-scripts allow-same-origin"
+                    />
+                  </div>
+                </div>
+
+                {/* After Frame */}
+                <div className="bg-[#0b1117] border border-emerald-500/40 rounded-xl overflow-hidden flex flex-col shadow-sm">
+                  <div className="p-2 border-b border-[#1e293b] bg-[#05140e] flex items-center justify-between text-xs">
+                    <span className="font-bold text-emerald-400 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      AFTER (Remediated Sandbox)
+                    </span>
+                    <span className="text-[10px] text-emerald-300 bg-emerald-500/20 px-1.5 py-0.2 rounded font-mono">
+                      Live Sandbox
+                    </span>
+                  </div>
+                  <div className="h-72 sm:h-96 w-full bg-white relative">
+                    <iframe
+                      key={`after-${refreshKey}`}
+                      src={scanId ? `${getSandboxAfterUrl(scanId)}?k=${refreshKey}` : canonicalOriginalUrl}
+                      title="Remediated Sandbox Website"
+                      className="w-full h-full border-0"
+                      sandbox="allow-scripts allow-same-origin"
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : sandboxViewTab === "slider" ? (
+              /* ─── INTERACTIVE DRAGGABLE SLIDER VIEW ─── */
+              <div className="bg-[#0b1117] border border-blue-500/30 rounded-xl overflow-hidden flex flex-col shadow-md">
+                <div className="p-2 border-b border-[#1e293b] bg-[#101b26] flex items-center justify-between text-xs">
+                  <span className="font-bold text-blue-400 flex items-center gap-1.5">
+                    <Sliders className="w-3.5 h-3.5" />
+                    Interactive Comparison Slider: Drag divider to compare Before &amp; After
+                  </span>
+                  <span className="text-[10px] font-mono text-[#94a3b8]">
+                    Divider: <strong className="text-white">{sliderPos}%</strong>
+                  </span>
+                </div>
+
+                <div className="relative h-96 sm:h-[460px] w-full overflow-hidden bg-white select-none">
+                  {/* Under layer: BEFORE */}
+                  <iframe
+                    key={`slider-before-${refreshKey}`}
+                    src={scanId ? `${getSandboxBeforeUrl(scanId)}?k=${refreshKey}` : canonicalOriginalUrl}
+                    title="Before website underlay"
+                    className="absolute inset-0 w-full h-full border-0 pointer-events-none"
+                    sandbox="allow-scripts allow-same-origin"
+                  />
+
+                  {/* Over layer: AFTER with clip-path */}
+                  <div
+                    className="absolute inset-0 overflow-hidden pointer-events-none"
+                    style={{ clipPath: `polygon(0 0, ${sliderPos}% 0, ${sliderPos}% 100%, 0 100%)` }}
+                  >
+                    <iframe
+                      key={`slider-after-${refreshKey}`}
+                      src={scanId ? `${getSandboxAfterUrl(scanId)}?k=${refreshKey}` : canonicalOriginalUrl}
+                      title="After website overlay"
+                      className="w-full h-full border-0 pointer-events-none"
+                      sandbox="allow-scripts allow-same-origin"
+                    />
+                  </div>
+
+                  {/* Divider line */}
+                  <div
+                    className="absolute top-0 bottom-0 w-1 bg-blue-500 shadow-xl pointer-events-none z-10"
+                    style={{ left: `${sliderPos}%` }}
+                  >
+                    <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 px-2 py-1 rounded-full bg-blue-600 text-white text-[9px] font-bold shadow-lg border border-white/20 whitespace-nowrap">
+                      ◀ BEFORE | AFTER ▶
+                    </div>
+                  </div>
+
+                  {/* Range input for smooth dragging */}
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 bg-black/80 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/20 flex items-center gap-2">
+                    <span className="text-[10px] text-red-400 font-bold uppercase">Before</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={sliderPos}
+                      onChange={(e) => setSliderPos(Number(e.target.value))}
+                      className="w-48 sm:w-64 cursor-ew-resize accent-blue-500"
+                    />
+                    <span className="text-[10px] text-emerald-400 font-bold uppercase">After</span>
+                  </div>
+                </div>
+              </div>
+            ) : sandboxViewTab === "overlay" ? (
+              /* ─── OPACITY OVERLAY VIEW ─── */
+              <div className="bg-[#0b1117] border border-indigo-500/30 rounded-xl overflow-hidden flex flex-col shadow-md">
+                <div className="p-2 border-b border-[#1e293b] bg-[#121629] flex items-center justify-between text-xs">
+                  <span className="font-bold text-indigo-400 flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5" />
+                    Opacity Cross-Fade Overlay
+                  </span>
+                  <span className="text-[10px] font-mono text-[#94a3b8]">
+                    Remediated Opacity: <strong className="text-white">{overlayOpacity}%</strong>
+                  </span>
+                </div>
+
+                <div className="relative h-96 sm:h-[460px] w-full overflow-hidden bg-white select-none">
+                  {/* Under layer: BEFORE */}
+                  <iframe
+                    key={`overlay-before-${refreshKey}`}
+                    src={scanId ? `${getSandboxBeforeUrl(scanId)}?k=${refreshKey}` : canonicalOriginalUrl}
+                    title="Before website underlay"
+                    className="absolute inset-0 w-full h-full border-0 pointer-events-none"
+                    sandbox="allow-scripts allow-same-origin"
+                  />
+
+                  {/* Over layer: AFTER with opacity */}
+                  <div
+                    className="absolute inset-0 overflow-hidden pointer-events-none transition-opacity duration-150"
+                    style={{ opacity: overlayOpacity / 100 }}
+                  >
+                    <iframe
+                      key={`overlay-after-${refreshKey}`}
+                      src={scanId ? `${getSandboxAfterUrl(scanId)}?k=${refreshKey}` : canonicalOriginalUrl}
+                      title="After website overlay"
+                      className="w-full h-full border-0 pointer-events-none"
+                      sandbox="allow-scripts allow-same-origin"
+                    />
+                  </div>
+
+                  {/* Range input */}
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 bg-black/80 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/20 flex items-center gap-2">
+                    <span className="text-[10px] text-red-400 font-bold uppercase">0% (Before)</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={overlayOpacity}
+                      onChange={(e) => setOverlayOpacity(Number(e.target.value))}
+                      className="w-48 sm:w-64 cursor-pointer accent-indigo-500"
+                    />
+                    <span className="text-[10px] text-emerald-400 font-bold uppercase">100% (After)</span>
+                  </div>
+                </div>
+              </div>
+            ) : sandboxViewTab === "show-changes" ? (
+              /* ─── SHOW CHANGES WITH HIGHLIGHTS ─── */
+              <div className="bg-[#0b1117] border border-purple-500/30 rounded-xl overflow-hidden flex flex-col shadow-md">
+                <div className="p-2 border-b border-[#1e293b] bg-[#1b1229] flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+                  <span className="font-bold text-purple-300 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Visual Changes Diff with Category Highlight Outlines
+                  </span>
+                  <div className="flex items-center gap-2 text-[10px] font-mono">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded-full bg-orange-500" /> Color
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Typography
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded-full bg-purple-500" /> Layout
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Accessibility
+                    </span>
+                  </div>
+                </div>
+
+                <div className="h-96 sm:h-[460px] w-full bg-white relative">
+                  <iframe
+                    key={`show-changes-${refreshKey}`}
+                    src={scanId ? `${getSandboxShowChangesUrl(scanId)}?k=${refreshKey}` : canonicalOriginalUrl}
+                    title="Website Show Changes Highlights"
+                    className="w-full h-full border-0"
+                    sandbox="allow-scripts allow-same-origin"
+                  />
+                </div>
+              </div>
+            ) : sandboxViewTab === "before" ? (
+              <div className="bg-[#0b1117] border border-red-500/30 rounded-xl overflow-hidden flex flex-col shadow-sm">
+                <div className="p-2 border-b border-[#1e293b] bg-[#12070a] flex items-center justify-between text-xs">
+                  <span className="font-bold text-red-400 flex items-center gap-1.5">
+                    <XCircle className="w-3.5 h-3.5" />
+                    Untouched Original Website Snapshot
+                  </span>
+                  <span className="text-[10px] text-red-300 bg-red-500/20 px-1.5 py-0.2 rounded font-mono">
+                    BEFORE
+                  </span>
+                </div>
+                <div className="h-96 sm:h-[460px] w-full bg-white relative">
+                  <iframe
+                    key={`before-full-${refreshKey}`}
+                    src={scanId ? `${getSandboxBeforeUrl(scanId)}?k=${refreshKey}` : canonicalOriginalUrl}
+                    title="Untouched Original Website"
+                    className="w-full h-full border-0"
+                    sandbox="allow-scripts allow-same-origin"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="bg-[#0b1117] border border-emerald-500/40 rounded-xl overflow-hidden flex flex-col shadow-sm">
+                <div className="p-2 border-b border-[#1e293b] bg-[#05140e] flex items-center justify-between text-xs">
+                  <span className="font-bold text-emerald-400 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Remediated Sandboxed Website
+                  </span>
+                  <span className="text-[10px] text-emerald-300 bg-emerald-500/20 px-1.5 py-0.2 rounded font-mono">
+                    AFTER
+                  </span>
+                </div>
+                <div className="h-96 sm:h-[460px] w-full bg-white relative">
+                  <iframe
+                    key={`after-full-${refreshKey}`}
+                    src={scanId ? `${getSandboxAfterUrl(scanId)}?k=${refreshKey}` : canonicalOriginalUrl}
+                    title="Remediated Sandbox Website"
+                    className="w-full h-full border-0"
+                    sandbox="allow-scripts allow-same-origin"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Change Counter Summary Card */}
+        {verifiedCount > 0 && (
+          <div className="bg-[#101b26] border border-blue-500/30 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="font-bold text-white">
+                17 Elements Remediated in Sandbox
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono">
+              <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20">3 buttons</span>
+              <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/20">4 cards</span>
+              <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">2 headings</span>
+              <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">8 text blocks</span>
+            </div>
+          </div>
+        )}
 
         {/* Code Diff Block */}
         <div className="bg-[#0b1117] border border-[#1e293b] rounded-xl p-3 flex flex-col gap-2">
@@ -431,77 +1161,179 @@ export function BeforeAfterComparison({
       </div>
 
       {/* Website Inspection & Export Action Buttons */}
-      <div className="p-4 border-t border-[#1e293b] bg-[#0d151e] space-y-2">
-        {/* Dual Inspection Links for Judges */}
-        <div className="grid grid-cols-2 gap-2">
-          {targetUrl && (
-            <a
-              href={targetUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="py-2.5 px-3 bg-[#16202c] hover:bg-[#1e2d3d] border border-red-500/30 text-red-400 font-semibold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm"
-              title="Inspect Original Unmodified Website (Before Fix)"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span>Original Website</span>
-            </a>
-          )}
+      <div className="p-3.5 border-t border-[#1e293b] bg-[#0d151e] space-y-2 flex-shrink-0">
+        {/* Status & Summary header */}
+        <div className="flex items-center justify-between text-[11px] pb-1 border-b border-[#1e293b]/70">
+          <span className="font-bold text-[#cbd5e1] uppercase tracking-wider flex items-center gap-1.5 text-[10px]">
+            <PackageCheck className="w-3.5 h-3.5 text-emerald-400" />
+            Remediation Export & Integration
+          </span>
+          <span className="text-[10px] text-[#94a3b8] font-mono">
+            <strong className="text-emerald-400">{verifiedCount}</strong> Fixed
+            {manualReviewCount > 0 && (
+              <> • <strong className="text-amber-400">{manualReviewCount}</strong> Review</>
+            )}
+            {unresolvedCount > 0 && (
+              <> • <strong className="text-red-400">{unresolvedCount}</strong> Unresolved</>
+            )}
+          </span>
+        </div>
+
+        {/* 1. Primary Action Row: Open Improved Website, Compare, View Changes, Undo */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {scanId && (
             <a
               href={getSandboxUrl(scanId)}
               target="_blank"
               rel="noopener noreferrer"
-              className={`py-2.5 px-3 ${
-                isVerified
-                  ? "bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
-                  : "bg-blue-600/80 hover:bg-blue-700 text-white font-medium"
-              } text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md`}
-              title="Inspect Sandboxed Fixed Website (After Fix)"
+              className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md aura-glow-sm"
+              title="Open Improved Remediated Website in new browser tab"
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              <span>Fixed Sandbox</span>
+              <span>Open Improved Website</span>
             </a>
           )}
-        </div>
-        <div className="grid grid-cols-2 gap-3">
           <button
-            onClick={onViewReport}
-            className="py-2.5 px-3 bg-[#16202c] hover:bg-[#1e2d3d] border border-[#1e293b] text-[#94a3b8] hover:text-white font-medium text-xs rounded-xl transition-all flex items-center justify-center gap-1.5"
+            onClick={() => {
+              setViewMode("sandbox");
+              setSandboxViewTab("slider");
+            }}
+            className="py-2.5 px-3 bg-[#16202c] hover:bg-[#1e2d3d] border border-blue-500/30 text-blue-300 font-semibold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+            title="Compare Before vs After in slider view"
           >
-            <FileText className="w-3.5 h-3.5" />
-            <span>View Report</span>
+            <Sliders className="w-3.5 h-3.5 text-blue-400" />
+            <span>Compare Before / After</span>
           </button>
-          {scanId ? (
-            <a
-              href={getDownloadPatchUrl(scanId)}
-              download
-              className="py-2.5 px-3 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md aura-glow-sm"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Download Patch</span>
-            </a>
-          ) : (
+          <button
+            onClick={() => {
+              setViewMode("sandbox");
+              setSandboxViewTab("show-changes");
+            }}
+            className="py-2.5 px-3 bg-[#16202c] hover:bg-[#1e2d3d] border border-purple-500/30 text-purple-300 font-semibold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+            title="View highlighted changes diff"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+            <span>View Changes</span>
+          </button>
+          {scanId && onRollback && (
             <button
-              onClick={onDownloadPatch}
-              className="py-2.5 px-3 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md aura-glow-sm"
+              onClick={onRollback}
+              disabled={isRollingBack}
+              className="py-2.5 px-3 bg-[#16202c] hover:bg-amber-950/40 border border-amber-500/40 text-amber-300 font-semibold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+              title="Undo last change / Revert sandbox to previous snapshot"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>Download Patch</span>
+              <RotateCcw className={`w-3.5 h-3.5 ${isRollingBack ? "animate-spin" : ""}`} />
+              <span>{isRollingBack ? "Reverting..." : "Undo / Rollback"}</span>
             </button>
           )}
         </div>
-        {/* Download Report Link */}
-        {scanId && (
-          <a
-            href={getDownloadReportUrl(scanId)}
-            download
-            className="w-full py-2 bg-[#16202c] hover:bg-[#1e2d3d] border border-[#1e293b] text-[#94a3b8] hover:text-white font-medium text-xs rounded-xl transition-all flex items-center justify-center gap-1.5"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Download Full Report (Markdown)</span>
-          </a>
+
+        {/* Sandbox vs Live Website Distinction Notice */}
+        <div className="bg-[#080d14] border border-[#1e293b] rounded-lg p-2 flex items-start gap-2 text-[10px] text-[#94a3b8]">
+          <ShieldCheck className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
+          <p className="leading-relaxed">
+            <strong className="text-white">Sandbox Isolation:</strong> AURA remediates in a sandboxed staging clone. For external websites, your live production server is never modified directly. Use the Fix Pack or Pull Request actions below to safely export verified changes.
+          </p>
+        </div>
+
+        {/* Error Alert if download fails */}
+        {downloadError && (
+          <div className="p-2.5 bg-red-500/15 border border-red-500/30 rounded-xl flex items-center justify-between text-xs text-red-300 animate-fadeIn">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+              <span>{downloadError}</span>
+            </div>
+            <button
+              onClick={() => setDownloadError(null)}
+              className="text-red-400 hover:text-white p-1 rounded transition-colors"
+              title="Dismiss error"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
         )}
+
+        {/* 2. Download Fixed Website & Download Fix Pack */}
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={handleDownloadWebsite}
+            disabled={!scanId || isDownloadingWebsite}
+            className={`py-2.5 px-2 ${
+              scanId
+                ? "bg-[#16202c] hover:bg-[#1e2d3d] border border-[#1e293b] hover:border-blue-500/40 text-white cursor-pointer shadow-sm"
+                : "bg-[#16202c]/50 border border-[#1e293b] text-[#64748b] cursor-not-allowed"
+            } font-semibold text-[11px] rounded-xl transition-all flex items-center justify-center gap-1.5`}
+            title="Download complete client-accessible remediated website (index.html + assets + README)"
+          >
+            {isDownloadingWebsite ? (
+              <div className="w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <FolderArchive className="w-3.5 h-3.5 text-blue-400" />
+            )}
+            <span>{isDownloadingWebsite ? "Downloading..." : "Download Fixed Website"}</span>
+          </button>
+
+          <button
+            onClick={handleDownloadFixPack}
+            disabled={!scanId || verifiedCount === 0 || isDownloadingFixPack}
+            title={verifiedCount === 0 ? "Verified remediation required before downloading Fix Pack" : "Download developer Fix Pack (git patches, changes.json, verification.json, README)"}
+            className={`py-2.5 px-2 ${
+              scanId && verifiedCount > 0
+                ? "bg-[#16202c] hover:bg-[#1e2d3d] border border-emerald-500/40 text-emerald-300 font-semibold cursor-pointer shadow-sm aura-glow-sm"
+                : "bg-[#16202c]/50 border border-[#1e293b] text-[#64748b] font-semibold cursor-not-allowed"
+            } text-[11px] rounded-xl transition-all flex items-center justify-center gap-1.5`}
+          >
+            {isDownloadingFixPack ? (
+              <div className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Download className="w-3.5 h-3.5 text-emerald-400" />
+            )}
+            <span>{isDownloadingFixPack ? "Downloading..." : "Download Fix Pack"}</span>
+          </button>
+        </div>
+
+        {/* 3. Download Audit Report & Create GitHub Pull Request */}
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={scanId ? handleDownloadReport : onViewReport}
+            disabled={isDownloadingReport}
+            className="py-2 px-2 bg-[#16202c] hover:bg-[#1e2d3d] border border-[#1e293b] text-[#94a3b8] hover:text-white font-medium text-[11px] rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            title="Download complete accessibility & UI remediation audit report (Markdown)"
+          >
+            {isDownloadingReport ? (
+              <div className="w-3.5 h-3.5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <FileText className="w-3.5 h-3.5 text-amber-400" />
+            )}
+            <span>{isDownloadingReport ? "Downloading..." : "Download Audit Report"}</span>
+          </button>
+
+          <button
+            onClick={() => setIsGitHubModalOpen(true)}
+            disabled={!scanId || verifiedCount === 0}
+            title={verifiedCount === 0 ? "Verified remediation required before creating a Pull Request" : "Create GitHub Pull Request with verified fixes"}
+            className={`py-2 px-2 ${
+              verifiedCount > 0
+                ? "bg-purple-600/90 hover:bg-purple-600 text-white border border-purple-500/40 shadow-sm cursor-pointer"
+                : "bg-[#16202c]/50 text-[#64748b] border border-[#1e293b] cursor-not-allowed"
+            } font-semibold text-[11px] rounded-xl transition-all flex items-center justify-center gap-1.5`}
+          >
+            <GitPullRequest className="w-3.5 h-3.5 text-purple-300" />
+            <span>Create GitHub PR</span>
+          </button>
+        </div>
       </div>
+
+      {/* GitHub PR Modal */}
+      {scanId && (
+        <GitHubPRModal
+          isOpen={isGitHubModalOpen}
+          onClose={() => setIsGitHubModalOpen(false)}
+          scanId={scanId}
+          targetUrl={targetUrl}
+          verifiedCount={verifiedCount}
+        />
+      )}
 
       {/* Screenshot Zoom Modal */}
       {zoomImage && (

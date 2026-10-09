@@ -22,6 +22,8 @@ interface HeroBannerProps {
   loading: boolean;
   demoLoading: boolean;
   error?: string;
+  scanStatus?: string;
+  hasVerifiedFixes?: boolean;
 }
 
 export function HeroBanner({
@@ -34,6 +36,8 @@ export function HeroBanner({
   loading,
   demoLoading,
   error,
+  scanStatus = "ready",
+  hasVerifiedFixes = false,
 }: HeroBannerProps) {
   // Slider position state for the interactive visual preview in the hero
   const [sliderPos, setSliderPos] = useState(55);
@@ -47,11 +51,39 @@ export function HeroBanner({
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-500/5 rounded-full blur-2xl pointer-events-none" />
 
         {/* Top Tagline Badge */}
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-3">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-semibold tracking-wide">
             <Sparkles className="w-3.5 h-3.5" />
-            Agentic AI for a More Accessible Web
+            Agentic AI for Autonomous UI Remediation
           </span>
+        </div>
+
+        {/* 6-Step Autonomous Workflow Progress Indicator */}
+        <div className="bg-[#0b1117] border border-[#1e293b] rounded-xl p-2.5 mb-4 overflow-x-auto">
+          <div className="flex items-center justify-between min-w-[560px] text-[11px] font-mono">
+            {[
+              { id: "scan", label: "1. SCAN", active: !scanStatus || scanStatus === "ready" || scanStatus === "pending" },
+              { id: "analyze", label: "2. ANALYZE", active: scanStatus === "scanning" || scanStatus === "analyzing" },
+              { id: "preview", label: "3. PREVIEW", active: scanStatus === "complete" && !hasVerifiedFixes },
+              { id: "apply", label: "4. APPLY", active: scanStatus === "remediating" || scanStatus === "fixing" },
+              { id: "verify", label: "5. VERIFY", active: scanStatus === "complete" && hasVerifiedFixes },
+              { id: "improved", label: "6. IMPROVED WEBSITE", active: Boolean(hasVerifiedFixes) },
+            ].map((step, idx, arr) => (
+              <React.Fragment key={step.id}>
+                <div
+                  className={`px-2.5 py-1 rounded-md flex items-center gap-1.5 transition-all ${
+                    step.active
+                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-bold shadow-xs"
+                      : "text-[#64748b]"
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${step.active ? "bg-emerald-400 animate-pulse" : "bg-[#334155]"}`} />
+                  <span>{step.label}</span>
+                </div>
+                {idx < arr.length - 1 && <span className="text-[#334155] select-none font-sans">→</span>}
+              </React.Fragment>
+            ))}
+          </div>
         </div>
 
         {/* Headline & Subtitle */}
@@ -60,7 +92,7 @@ export function HeroBanner({
             Detect. <span className="text-emerald-400">Fix.</span> Verify.
           </h1>
           <p className="text-[#94a3b8] text-sm md:text-base max-w-xl leading-relaxed">
-            Scan any website for accessibility and UI issues, automatically fix them using AI, and verify the results with real re-audits.
+            AURA autonomously analyzes accessibility, visual design, UX, responsiveness, performance and consistency — previewing and verifying every remediation in an isolated sandbox before export.
           </p>
         </div>
 
@@ -168,47 +200,59 @@ export function HeroBanner({
 
       {/* Right Column: How AURA Works Card */}
       <div id="how-it-works" className="lg:col-span-4 bg-[#0f1720] border border-[#1e293b] rounded-2xl p-6 flex flex-col justify-between shadow-xl">
-        <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+        <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-3.5 flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-emerald-400" />
           How AURA Works
         </h3>
 
-        <div className="space-y-3.5">
+        <div className="space-y-2.5">
           <WorkStep
             num={1}
             title="Scan Website"
-            desc="Browser automation opens page & loads full DOM"
+            desc="Browser automation loads the target website and captures its DOM, styles and assets."
             color="bg-blue-500"
           />
           <WorkStep
             num={2}
-            title="Detect Issues"
-            desc="axe-core performs deterministic WCAG audit"
-            color="bg-purple-500"
+            title="Analyze"
+            desc="AURA combines deterministic accessibility checks, DOM/CSS analysis and contextual AI analysis."
+            color="bg-indigo-500"
           />
           <WorkStep
             num={3}
-            title="Understand"
-            desc="AI analyzes root cause & element context"
-            color="bg-emerald-500"
+            title="Identify Issues"
+            desc="Detects accessibility, contrast, image, structure and supported UI/UX problems."
+            color="bg-purple-500"
           />
           <WorkStep
             num={4}
-            title="Fix Automatically"
-            desc="Safety validator compiles safe DOM patch"
+            title="Generate Safe Improvements"
+            desc="AI identifies remediation and UI/UX improvement opportunities and creates safe change plans."
             color="bg-amber-500"
           />
           <WorkStep
             num={5}
-            title="Re-Audit"
-            desc="Runs audit again & verifies issue resolution"
+            title="Apply in Sandbox"
+            desc="Changes are applied to an isolated copy of the same target website."
+            color="bg-teal-500"
+          />
+          <WorkStep
+            num={6}
+            title="Re-Audit & Verify"
+            desc="AURA checks accessibility, visuals, responsiveness and regressions after the changes."
+            color="bg-emerald-500"
+          />
+          <WorkStep
+            num={7}
+            title="Report Results"
+            desc="Shows improvements, fixed issues, remaining issues, regressions and manual-review items."
             color="bg-emerald-400"
           />
         </div>
 
         <div className="mt-4 pt-3 border-t border-[#1e293b] text-[11px] text-[#94a3b8] flex items-center justify-between">
-          <span>Closed-loop agent</span>
-          <span className="text-emerald-400 font-medium">100% Real Audits</span>
+          <span>Closed-loop remediation</span>
+          <span className="text-emerald-400 font-medium">Scan → Understand → Improve → Verify</span>
         </div>
       </div>
     </div>

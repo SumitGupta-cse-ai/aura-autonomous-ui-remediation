@@ -23,19 +23,25 @@
 }
 
 html.light {
-  --aura-bg: #f8fafc;
-  --aura-surface: #ffffff;
-  --aura-surface-elevated: #f1f5f9;
-  --aura-surface-hover: #e2e8f0;
-  --aura-border: #e2e8f0;
-  --aura-border-light: #cbd5e1;
-  --aura-border-active: #10b981;
-  --aura-primary: #10b981;
-  --aura-primary-hover: #059669;
-  --aura-primary-glow: rgba(16, 185, 129, 0.15);
-  --aura-text: #0f172a;
-  --aura-text-secondary: #475569;
-  --aura-text-muted: #64748b;
+  --aura-bg: #F1F6FA;
+  --aura-surface: #FCFDFD;
+  --aura-surface-elevated: #F1F6FA;
+  --aura-surface-hover: #EAF2F7;
+  --aura-border: #CBD8E3;
+  --aura-border-light: #B8C8D6;
+  --aura-border-active: #0F9F8F;
+  --aura-primary: #0F9F8F;
+  --aura-primary-hover: #0B8275;
+  --aura-primary-glow: rgba(15, 159, 143, 0.15);
+  --aura-text: #102A43;
+  --aura-text-secondary: #526579;
+  --aura-text-muted: #66788A;
+
+  --aura-critical: #DC2626;
+  --aura-serious: #EA580C;
+  --aura-moderate: #D97706;
+  --aura-minor: #2563EB;
+  --aura-verified: #0F9F8F;
 }
 
 @theme inline {
@@ -48,7 +54,7 @@ html.light {
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--aura-border-light) transparent;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 body {
@@ -57,56 +63,6 @@ body {
   font-family: var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
   min-height: 100vh;
   overflow-x: hidden;
-}
-
-/* Light mode overrides for layout components */
-html.light body {
-  background-color: #f8fafc;
-  color: #0f172a;
-}
-
-html.light aside {
-  background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
-}
-
-html.light header {
-  background-color: rgba(255, 255, 255, 0.9) !important;
-  border-color: #e2e8f0 !important;
-}
-
-html.light .bg-\[\#0f1720\],
-html.light .bg-\[\#0b1117\],
-html.light .bg-\[\#0d151e\],
-html.light .bg-\[\#070c12\],
-html.light .bg-\[\#16202c\] {
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-}
-
-html.light .border-\[\#1e293b\],
-html.light .border-\[\#334155\] {
-  border-color: #e2e8f0 !important;
-}
-
-html.light .text-white {
-  color: #0f172a !important;
-}
-
-html.light .text-\[\#94a3b8\],
-html.light .text-\[\#64748b\] {
-  color: #475569 !important;
-}
-
-html.light input {
-  background-color: #f8fafc !important;
-  color: #0f172a !important;
-  border-color: #cbd5e1 !important;
-}
-
-html.light pre, html.light code {
-  background-color: #f1f5f9 !important;
-  color: #0f766e !important;
 }
 
 /* Custom scrollbar */
@@ -136,4 +92,330 @@ html.light pre, html.light code {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* ========================================================================= */
+/* DAY / LIGHT MODE COMPREHENSIVE DESIGN SYSTEM SCOPED UNDER html.light      */
+/* Dark mode styles remain 100% untouched and preserved                      */
+/* ========================================================================= */
+
+html.light body {
+  background-color: #F1F6FA;
+  color: #102A43;
+}
+
+/* Top Layout Wrapper in page.tsx */
+html.light .bg-\[\#0b1117\] {
+  background-color: #F1F6FA !important;
+  color: #102A43 !important;
+}
+
+/* Sidebar Styling */
+html.light aside {
+  background-color: #FCFDFD !important;
+  border-color: #CBD8E3 !important;
+  box-shadow: 2px 0 10px rgba(16, 42, 67, 0.03) !important;
+}
+
+html.light aside .text-white {
+  color: #102A43 !important;
+}
+
+html.light aside a.bg-emerald-500\/10,
+html.light aside div.bg-emerald-500\/10,
+html.light aside .bg-emerald-500\/20 {
+  background-color: #EEF8F7 !important;
+  border-color: #B8E4DE !important;
+}
+
+/* TopHeader Styling */
+html.light header {
+  background-color: rgba(252, 253, 253, 0.94) !important;
+  border-color: #CBD8E3 !important;
+  box-shadow: 0 2px 10px rgba(16, 42, 67, 0.03) !important;
+}
+
+/* Primary Card Surfaces */
+html.light .bg-\[\#0f1720\],
+html.light .bg-\[\#0d151e\],
+html.light .bg-\[\#070c12\],
+html.light .bg-\[\#080d14\],
+html.light .bg-\[\#0a0a0f\],
+html.light .bg-\[\#0b131e\],
+html.light .bg-\[\#101b26\] {
+  background-color: #FCFDFD !important;
+  color: #102A43 !important;
+}
+
+/* Elevated Surfaces, Inner Containers, List Items, Pills */
+html.light .bg-\[\#16202c\],
+html.light .bg-\[\#141b24\],
+html.light .bg-\[\#121922\],
+html.light .bg-\[\#121c27\],
+html.light .bg-\[\#111118\],
+html.light .bg-\[\#1a1a24\] {
+  background-color: #F1F6FA !important;
+  color: #102A43 !important;
+}
+
+/* Interactive Hover States */
+html.light .hover\:bg-\[\#1e2d3d\]:hover,
+html.light .hover\:bg-\[\#131d27\]:hover,
+html.light .hover\:bg-\[\#16202c\]:hover {
+  background-color: #EAF2F7 !important;
+}
+
+/* Standard Borders */
+html.light .border-\[\#1e293b\],
+html.light .border-\[\#334155\] {
+  border-color: #CBD8E3 !important;
+}
+
+html.light .divide-\[\#1e293b\] > :not([hidden]) ~ :not([hidden]) {
+  border-color: #CBD8E3 !important;
+}
+
+/* Typography Overrides for High Contrast Legibility */
+html.light .text-white,
+html.light .text-\[\#f8fafc\],
+html.light .text-\[\#f5f5f5\] {
+  color: #102A43 !important;
+}
+
+html.light .text-\[\#94a3b8\],
+html.light .text-\[\#cbd5e1\],
+html.light .text-\[\#e2e8f0\],
+html.light .text-\[\#9ca3af\] {
+  color: #526579 !important;
+}
+
+html.light .text-\[\#64748b\],
+html.light .text-\[\#6b7280\],
+html.light .text-\[\#334155\] {
+  color: #66788A !important;
+}
+
+/* Accent Colors & Badges in Day Mode */
+html.light .text-emerald-400,
+html.light .text-emerald-300 {
+  color: #0F9F8F !important;
+}
+
+html.light .bg-emerald-500 {
+  background-color: #0F9F8F !important;
+  color: #ffffff !important;
+}
+
+html.light .hover\:bg-emerald-600:hover {
+  background-color: #0B8275 !important;
+}
+
+html.light .bg-emerald-500\/10,
+html.light .bg-emerald-500\/15,
+html.light .bg-emerald-500\/20 {
+  background-color: #EEF8F7 !important;
+}
+
+html.light .border-emerald-500\/30,
+html.light .border-emerald-500\/40 {
+  border-color: #B8E4DE !important;
+}
+
+html.light .text-red-400 {
+  color: #DC2626 !important;
+}
+
+html.light .bg-red-500\/10,
+html.light .bg-red-500\/15,
+html.light .bg-red-500\/20 {
+  background-color: #FEF2F2 !important;
+}
+
+html.light .border-red-500\/30,
+html.light .border-red-500\/40 {
+  border-color: #FECACA !important;
+}
+
+html.light .text-amber-300,
+html.light .text-amber-400 {
+  color: #D97706 !important;
+}
+
+html.light .bg-amber-500\/10,
+html.light .bg-amber-500\/15,
+html.light .bg-amber-500\/20 {
+  background-color: #FFFBEB !important;
+}
+
+html.light .border-amber-500\/30,
+html.light .border-amber-500\/40 {
+  border-color: #FDE68A !important;
+}
+
+html.light .text-blue-400 {
+  color: #2563EB !important;
+}
+
+html.light .bg-blue-500\/10,
+html.light .bg-blue-500\/15,
+html.light .bg-blue-500\/20 {
+  background-color: #EFF6FF !important;
+}
+
+html.light .border-blue-500\/30,
+html.light .border-blue-500\/40 {
+  border-color: #BFDBFE !important;
+}
+
+/* ========================================================================= */
+/* HERO BANNER DAY MODE VISUAL REDESIGN                                      */
+/* Replaces dark central block with a light premium surface & clean navy typography */
+/* ========================================================================= */
+
+html.light .from-\[\#0f1720\] {
+  background-image: linear-gradient(135deg, #FCFDFD 0%, #EEF8F7 50%, #E8F4F8 100%) !important;
+  background-color: #FCFDFD !important;
+  border-color: #B8C8D6 !important;
+  box-shadow: 0 10px 30px rgba(16, 42, 67, 0.06), 0 2px 8px rgba(16, 42, 67, 0.04) !important;
+}
+
+/* Hero Tagline Badge */
+html.light .from-\[\#0f1720\] .bg-emerald-500\/15 {
+  background-color: #EEF8F7 !important;
+  border-color: #B8E4DE !important;
+  color: #0F9F8F !important;
+}
+
+/* Hero 6-Step Workflow Bar */
+html.light .from-\[\#0f1720\] .bg-\[\#0b1117\] {
+  background-color: #F1F6FA !important;
+  border-color: #CBD8E3 !important;
+}
+
+html.light .from-\[\#0f1720\] .from-\[\#0b1117\] {
+  background-color: #F1F6FA !important;
+}
+
+/* Hero Headline & Subtitle */
+html.light .from-\[\#0f1720\] h1 {
+  color: #102A43 !important;
+}
+
+html.light .from-\[\#0f1720\] h1 .text-emerald-400 {
+  color: #0F9F8F !important;
+}
+
+html.light .from-\[\#0f1720\] p {
+  color: #526579 !important;
+}
+
+/* Hero URL Scanner Input */
+html.light .from-\[\#0f1720\] input {
+  background-color: #FCFDFD !important;
+  border-color: #CBD8E3 !important;
+  color: #102A43 !important;
+  box-shadow: 0 1px 3px rgba(16, 42, 67, 0.04) !important;
+}
+
+html.light .from-\[\#0f1720\] input::placeholder {
+  color: #66788A !important;
+}
+
+html.light .from-\[\#0f1720\] input:focus {
+  border-color: #0F9F8F !important;
+  box-shadow: 0 0 0 3px rgba(15, 159, 143, 0.15) !important;
+}
+
+/* Quick Test Buttons in Hero */
+html.light .from-\[\#0f1720\] button.bg-\[\#16202c\],
+html.light .from-\[\#0f1720\] .bg-\[\#16202c\] {
+  background-color: #F1F6FA !important;
+  border-color: #CBD8E3 !important;
+  color: #102A43 !important;
+}
+
+html.light .from-\[\#0f1720\] button.bg-\[\#16202c\]:hover {
+  background-color: #EAF2F7 !important;
+  border-color: #B8C8D6 !important;
+}
+
+html.light .from-\[\#0f1720\] button.bg-\[\#16202c\] .text-emerald-400 {
+  color: #0F9F8F !important;
+}
+
+/* Hero Glow Backgrounds Tamed in Day Mode */
+html.light .from-\[\#0f1720\] .bg-emerald-500\/10 {
+  background-color: rgba(15, 159, 143, 0.06) !important;
+}
+
+html.light .from-\[\#0f1720\] .bg-blue-500\/5 {
+  background-color: rgba(37, 99, 235, 0.04) !important;
+}
+
+/* ========================================================================= */
+/* CARDS, ELEVATIONS & SHADOW SYSTEM IN DAY MODE                             */
+/* ========================================================================= */
+
+html.light .shadow-xl,
+html.light .shadow-2xl,
+html.light .shadow-lg {
+  box-shadow: 0 4px 14px rgba(16, 42, 67, 0.05), 0 1px 3px rgba(16, 42, 67, 0.04) !important;
+}
+
+html.light .aura-glow {
+  box-shadow: 0 4px 20px rgba(15, 159, 143, 0.12), 0 1px 4px rgba(15, 159, 143, 0.06) !important;
+}
+
+html.light .aura-glow-sm {
+  box-shadow: 0 2px 10px rgba(15, 159, 143, 0.10) !important;
+}
+
+/* ========================================================================= */
+/* COMPONENT-SPECIFIC DAY MODE POLISH                                       */
+/* ========================================================================= */
+
+/* Inputs & Form Controls */
+html.light input,
+html.light textarea,
+html.light select {
+  background-color: #FCFDFD !important;
+  color: #102A43 !important;
+  border-color: #CBD8E3 !important;
+}
+
+html.light input:focus,
+html.light textarea:focus,
+html.light select:focus {
+  border-color: #0F9F8F !important;
+  box-shadow: 0 0 0 3px rgba(15, 159, 143, 0.15) !important;
+}
+
+/* Code Snippets & Diff Blocks */
+html.light pre,
+html.light code {
+  background-color: #F1F6FA !important;
+  color: #102A43 !important;
+  border-color: #CBD8E3 !important;
+}
+
+/* Issue Explorer Filter Tabs */
+html.light #issues-section .bg-\[\#0f1720\] {
+  background-color: #FCFDFD !important;
+  border-color: #CBD8E3 !important;
+}
+
+/* BeforeAfterComparison Export Action Bar */
+html.light .border-t.border-\[\#1e293b\].bg-\[\#0d151e\],
+html.light .bg-\[\#0d151e\] {
+  background-color: #F1F6FA !important;
+  border-color: #CBD8E3 !important;
+}
+
+/* Modal Backdrops & Dialogs */
+html.light .bg-black\/80,
+html.light .bg-black\/70,
+html.light .bg-black\/60,
+html.light .bg-black\/50 {
+  background-color: rgba(16, 42, 67, 0.45) !important;
+  backdrop-filter: blur(4px) !important;
 }

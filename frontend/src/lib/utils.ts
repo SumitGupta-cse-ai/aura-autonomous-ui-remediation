@@ -41,12 +41,26 @@ export function statusColor(status: IssueStatus): string {
   switch (status) {
     case 'fixed':
       return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30';
+    case 'partially_fixed':
+      return 'text-teal-400 bg-teal-400/10 border-teal-400/30';
+    case 'source_required':
+      return 'text-indigo-400 bg-indigo-400/10 border-indigo-400/30';
+    case 'third_party':
+      return 'text-purple-400 bg-purple-400/10 border-purple-400/30';
+    case 'blocked':
+      return 'text-amber-400 bg-amber-400/10 border-amber-400/30';
+    case 'preview_ready':
+      return 'text-blue-400 bg-blue-400/10 border-blue-400/30';
+    case 'applying':
+    case 'verifying':
     case 'fixing':
       return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/30';
     case 'failed':
     case 'rolled_back':
+    case 'verification_failed':
       return 'text-red-400 bg-red-400/10 border-red-400/30';
     case 'needs_review':
+    case 'unverified':
       return 'text-orange-400 bg-orange-400/10 border-orange-400/30';
     default:
       return 'text-gray-400 bg-gray-400/10 border-gray-400/30';

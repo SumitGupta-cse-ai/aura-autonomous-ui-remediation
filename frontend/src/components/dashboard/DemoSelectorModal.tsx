@@ -79,6 +79,15 @@ export function DemoSelectorModal({
       difficulty: "Advanced",
       demonstrates: "Table button ARIA labeling, dark theme contrast audit, avatar alt text fix",
     },
+    {
+      id: "clean_site",
+      name: "4. Clean Website (Zero-Error Showcase)",
+      description: "Apex Studio: Fully accessible, zero WCAG error modern website. Demonstrates Stage 2 AI Website Improvement Advisor, 9-dimension design assessment, and 4 authentic brand color palettes.",
+      url: "demo-site/clean_site.html",
+      expected_issues: "0 errors, 5 AI improvements",
+      difficulty: "Zero-Error Showcase",
+      demonstrates: "Zero Errors != Zero Value: AI Website Improvement Advisor & Brand Palettes",
+    },
   ];
 
   const sourceList = demos.length > 0 ? demos : defaultDemos;
@@ -86,7 +95,7 @@ export function DemoSelectorModal({
     let cleanUrl = d.url;
     if (cleanUrl.includes("demo-site/")) {
       cleanUrl = cleanUrl.substring(cleanUrl.indexOf("demo-site/"));
-    } else if (cleanUrl.match(/^(demo[123]|full_remediation)(\.html)?$/i)) {
+    } else if (cleanUrl.match(/^(demo[123]|full_remediation|clean_site)(\.html)?$/i)) {
       cleanUrl = `demo-site/${cleanUrl.endsWith(".html") ? cleanUrl : cleanUrl + ".html"}`;
     }
     return {
@@ -96,9 +105,11 @@ export function DemoSelectorModal({
   });
 
   const icons: Record<string, React.ReactNode> = {
+    full_remediation: <Sparkles className="w-5 h-5 text-emerald-400" />,
     demo1: <FileCode className="w-5 h-5 text-emerald-400" />,
     demo2: <ShoppingBag className="w-5 h-5 text-blue-400" />,
     demo3: <LayoutDashboard className="w-5 h-5 text-purple-400" />,
+    clean_site: <Sparkles className="w-5 h-5 text-amber-400" />,
   };
 
   return (

@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 350" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f1f5f9"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+    <linearGradient id="shoeRed" x1="0%" y1="0%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#ef4444"/>
+      <stop offset="60%" stop-color="#dc2626"/>
+      <stop offset="100%" stop-color="#991b1b"/>
+    </linearGradient>
+    <linearGradient id="soleGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#cbd5e1"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="12" flood-color="#0f172a" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+  <rect width="500" height="350" rx="12" fill="url(#bgGrad)"/>
+  
+  <!-- Subtle background graphic -->
+  <circle cx="250" cy="175" r="130" fill="#e0e7ff" opacity="0.4"/>
+  
+  <g filter="url(#shadow)">
+    <!-- Sole Shadow -->
+    <ellipse cx="250" cy="275" rx="170" ry="18" fill="#000000" opacity="0.12"/>
+    
+    <!-- Outer Sole (White/Grey Rubber) -->
+    <path d="M 90 240 Q 150 255 260 250 Q 380 245 420 220 Q 425 240 390 260 Q 260 275 110 262 Z" fill="url(#soleGrad)"/>
+    <path d="M 90 240 Q 150 255 260 250 Q 380 245 420 220 L 420 230 Q 370 252 260 256 Q 140 260 90 245 Z" fill="#0f172a"/>
+
+    <!-- Midsole Grip Pattern -->
+    <path d="M 120 255 L 130 258 M 160 257 L 170 260 M 200 257 L 210 260 M 240 256 L 250 259 M 280 254 L 290 257 M 320 250 L 330 253 M 360 244 L 370 247" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- Shoe Main Body Upper (Vibrant Crimson Red) -->
+    <path d="M 90 240 C 95 210 130 180 180 185 C 220 188 230 145 280 120 C 310 105 350 140 375 170 C 405 195 425 210 420 220 C 370 245 250 250 90 240 Z" fill="url(#shoeRed)"/>
+
+    <!-- Collar / Ankle Opening -->
+    <path d="M 270 125 C 290 115 325 125 340 145 C 315 150 285 145 270 125 Z" fill="#1e293b"/>
+    <path d="M 285 130 C 300 122 320 130 330 142 Z" fill="#475569"/>
+
+    <!-- Breathable Mesh Texture & Aerodynamic Panels -->
+    <path d="M 115 228 C 130 200 170 195 210 200 C 180 220 140 230 115 228 Z" fill="#b91c1c" opacity="0.6"/>
+    <path d="M 140 215 Q 170 210 195 214" stroke="#fca5a5" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+    <path d="M 130 222 Q 165 218 190 222" stroke="#fca5a5" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+
+    <!-- Dynamic Swoosh / Speed Emblem (Electric White & Silver) -->
+    <path d="M 160 215 Q 240 170 340 160 Q 270 200 210 225 Q 180 220 160 215 Z" fill="#ffffff"/>
+    <path d="M 175 213 Q 240 175 320 168 Q 265 198 215 220 Z" fill="#f1f5f9"/>
+
+    <!-- Laces & Eyelets -->
+    <path d="M 240 175 L 265 155 M 255 185 L 280 165 M 270 195 L 295 175 M 285 205 L 310 185" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="240" cy="175" r="3" fill="#1e293b"/>
+    <circle cx="255" cy="185" r="3" fill="#1e293b"/>
+    <circle cx="270" cy="195" r="3" fill="#1e293b"/>
+    <circle cx="285" cy="205" r="3" fill="#1e293b"/>
+    <circle cx="265" cy="155" r="3" fill="#1e293b"/>
+    <circle cx="280" cy="165" r="3" fill="#1e293b"/>
+    <circle cx="295" cy="175" r="3" fill="#1e293b"/>
+    <circle cx="310" cy="185" r="3" fill="#1e293b"/>
+
+    <!-- Toe Cap Reinforcement -->
+    <path d="M 90 240 C 95 225 110 215 125 218 C 110 235 100 242 90 240 Z" fill="#7f1d1d" opacity="0.7"/>
+  </g>
+  
+  <!-- Product Label Badge -->
+  <g transform="translate(24, 24)">
+    <rect width="115" height="26" rx="6" fill="#0f172a" opacity="0.85"/>
+    <text x="10" y="17" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" font-weight="700" letter-spacing="0.5">TRAIL PRO 2026</text>
+  </g>
+</svg>
